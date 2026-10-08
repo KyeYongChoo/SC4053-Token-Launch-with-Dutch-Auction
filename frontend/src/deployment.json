@@ -1,0 +1,9 @@
+{
+  "address": null,
+  "token": null,
+  "chainId": 31337,
+  "deployBlock": 0,
+  "owner": null,
+  "stepSeconds": 60,
+  "abi": []
+}

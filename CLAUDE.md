@@ -9,7 +9,7 @@ Ethereum token launch: an ERC-20 sold by a 20-minute stepped Dutch auction with 
 ## Commands
 - `npm ci`: install (use this, not `npm install`, to match CI).
 - `npm test`: contract tests. CI is the merge gate (`.github/workflows/ci.yml`). The Stop hook runs these tests locally but cannot block on failure.
-- `npm run frontend:build`: front-end build.
+- `npm run frontend:test`: front-end tests (Vitest). `npm run frontend:build`: front-end build.
 - `npm run node`, then `npm run deploy:local`: local demo.
 
 ## Layout

@@ -85,7 +85,7 @@ Ended ──finalize() / auto──▶ Finalized ──now > finalizedAt+30d, sw
 - **Swept**: views only.
 
 ## 6. Front end
-- MetaMask connect. Works against the local chain and Sepolia, The RPC URL comes from the environment. The chain ID comes from the generated deployment file (`frontend/src/deployment.json`). Shows a warning on the wrong chain.
+- MetaMask connect. Works against the local chain and Sepolia. The RPC URL comes from the environment. The chain ID comes from the generated deployment file (`frontend/src/deployment.json`). Shows a warning on the wrong chain.
 - **Bid form**: an ETH amount box, a max-price box (with a "buy at any price" shortcut that sets it to P0), and a Bid button. Shows a live preview of the snapped step price and whether the bid is live or standing.
 - **Price line chart**: the full stepped schedule P0 → R with a "now" marker; a demand overlay line (`D(k)·1e18/S`, the price at which current demand buys all supply); the standing-order ladder (ETH waiting at each future step); and the clearing point highlighted after finalize.
 - **Status panel**: state, current price, countdown to the next step and to the end, ETH committed, % of supply covered at the current price.

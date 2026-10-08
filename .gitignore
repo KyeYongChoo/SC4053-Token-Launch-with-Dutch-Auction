@@ -1,9 +1,0 @@
-node_modules/
-artifacts/
-cache/
-coverage/
-coverage.json
-typechain-types/
-.env
-frontend/dist/
-frontend/src/contracts/deployment.json

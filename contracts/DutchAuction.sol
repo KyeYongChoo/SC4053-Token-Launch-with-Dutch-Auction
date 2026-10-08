@@ -15,6 +15,8 @@ contract DutchAuction is Ownable, ReentrancyGuard {
     uint256 public constant AUCTION_DURATION = 20 minutes; // SPEC §2.1
     uint256 public constant CLAIM_PERIOD = 30 days; // SPEC §2.15
     uint256 public constant MAX_STEPS = 120; // SPEC §2.1
+    uint256 public constant MAX_SUPPLY = 1e30; // SPEC §2.1: 1e12 whole tokens, keeps price * supply * WAD inside uint256
+    uint256 public constant MAX_START_PRICE = 1e24; // SPEC §2.1: 1e6 ETH per token
     uint256 private constant WAD = 1e18;
 
     enum State {
@@ -106,6 +108,8 @@ contract DutchAuction is Ownable, ReentrancyGuard {
         uint256 minBid_
     ) Ownable(msg.sender) {
         require(supply_ > 0, "supply");
+        require(supply_ <= MAX_SUPPLY, "supply too large");
+        require(startPrice_ <= MAX_START_PRICE, "price too large");
         require(reservePrice_ > 0 && startPrice_ > reservePrice_, "prices");
         require(minBid_ > 0, "minBid");
         require(stepDuration_ > 0 && AUCTION_DURATION % stepDuration_ == 0, "stepDuration");
@@ -122,6 +126,11 @@ contract DutchAuction is Ownable, ReentrancyGuard {
     }
 
     // ───────────────────────── Owner ─────────────────────────
+
+    /// @notice Renouncing is disabled: proceeds and the sweep need an owner (SPEC §1).
+    function renounceOwnership() public pure override {
+        revert("renounce disabled");
+    }
 
     /// @notice Starts the clock. Only callable once (SPEC §4).
     function startAuction() external onlyOwner {

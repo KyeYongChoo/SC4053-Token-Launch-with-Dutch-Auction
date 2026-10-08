@@ -10,7 +10,7 @@ Notation: `S` = token supply (token-wei, 18 decimals), `P0` = start price, `R` =
 ## 1. Roles
 | Role | Who | Powers |
 |---|---|---|
-| Owner | Deployer of the auction contract | `startAuction()` once; `withdrawProceeds()` once after finalization; `sweep()` after the claim deadline. No pause, cancel or parameter changes after deploy. May bid like anyone else (shill bidding is accepted as an off-chain trust issue). |
+| Owner | Deployer of the auction contract | `startAuction()` once; `withdrawProceeds()` once after finalization; `sweep()` after the claim deadline. No pause, cancel or parameter changes after deploy. Ownership can be transferred with `transferOwnership` but not renounced: `renounceOwnership` reverts, so proceeds and the sweep always have an owner. May bid like anyone else (shill bidding is accepted as an off-chain trust issue). |
 | Bidder | Any address, the owner included | `bid`, `cancelBid` (own standing orders only), `claim` |
 | Anyone | Any address | `finalize()` once the auction has ended; all view functions |
 | Token contract | ERC-20 deployed by the auction constructor | Mints `S` to the auction contract at deploy. Supports burn by holder. No further minting ever. |
@@ -18,7 +18,7 @@ Notation: `S` = token supply (token-wei, 18 decimals), `P0` = start price, `R` =
 ## 2. Business rules
 **Fixed choices:** Solidity smart contracts on the EVM; ERC-20 token; MetaMask wallet; local dev chain plus Sepolia. Frameworks and libraries are left to implementation (stack-agnostic).
 
-1. **Parameters**: constructor args `tokenName, tokenSymbol, S, P0, R, Δ, minBid`, all immutable. Total duration is fixed at 1200 s and the claim period is fixed at 30 days. The constructor reverts unless `P0 > R > 0`, `S > 0`, `minBid > 0`, `1200 % Δ == 0`, and `2 ≤ N ≤ 120`.
+1. **Parameters**: constructor args `tokenName, tokenSymbol, S, P0, R, Δ, minBid`, all immutable. Total duration is fixed at 1200 s and the claim period is fixed at 30 days. The constructor reverts unless `P0 > R > 0`, `S > 0`, `minBid > 0`, `1200 % Δ == 0`, `2 ≤ N ≤ 120`, `S ≤ 1e30` token-wei (1e12 tokens), and `P0 ≤ 1e24` wei (1e6 ETH per token). The bounds keep price × supply × 1e18 inside uint256.
 2. **Price schedule (linear steps)**: `step(t) = floor((t − T0) / Δ)` for `T0 ≤ t < END`. `price(k) = P0 − floor(k·(P0 − R)/(N − 1))`, so `price(0) = P0` and `price(N−1) = R`, which is live for the final Δ seconds.
 3. **Bid** = `(ethAmount = msg.value, maxPrice)`. Validation: auction Active and not ended; `msg.value ≥ minBid`; `maxPrice ≥ R`.
 4. **Snapping**: `maxStep m` = the smallest k with `price(k) ≤ maxPrice` (the price rounds down to a step price). If `maxPrice ≥ P0` then `m = 0`.
@@ -68,7 +68,7 @@ ETH is never sent in a loop over bidders. Nobody can withdraw another party's ET
 | `sweep()` | owner | Once, when `now > deadline`. |
 | Views | anyone | `state()`, `token()`, `startTime()`, `endTime()`, `stepCount()`, `currentStep()`, `currentPrice()`, `priceAt(k)`, `stepJoinAmount(k)` (ETH joining at step k), `demandAt(k)`, `isEnded()`, `getBid(id)`, `bidsOf(addr)`, `previewClaim(addr) → (tokens, refund)` (exact after finalize, estimated before), `clearingStep()`, `clearingPrice()`, `tokensSold()`, `proceeds()`, `claimDeadline()`. |
 
-**Events**: `AuctionStarted(startTime, endTime)`; `BidPlaced(bidId, bidder, ethAmount, maxPrice, placedStep, effectiveStep)`; `BidCancelled(bidId, bidder, refund)`; `SoldOut(step, price)`; `Finalized(clearingStep, clearingPrice, tokensSold, tokensBurned, soldOut)`; `Claimed(bidder, tokens, refund)`; `ProceedsWithdrawn(owner, amount)`; `Swept(tokensBurned, ethToOwner)`.
+**Events**: `AuctionStarted(startTime, endTime)`; `BidPlaced(bidId, bidder, ethAmount, maxPrice, placedStep, effectiveStep)`; `BidCancelled(bidId, bidder, refund)`; `SoldOut(step, price)`; `AuctionFinalized(clearingStep, clearingPrice, tokensSold, tokensBurned, soldOut)`; `Claimed(bidder, tokens, refund)`; `ProceedsWithdrawn(owner, amount)`; `AuctionSwept(tokensBurned, ethToOwner)`.
 
 **Test-only (bonus)**: `VulnerableAuction` has the same claim logic but sends ETH before marking the claim done and has no guard. `ReentrancyAttacker` re-enters `claim` from `receive()`.
 
@@ -85,7 +85,7 @@ Ended ──finalize() / auto──▶ Finalized ──now > finalizedAt+30d, sw
 - **Swept**: views only.
 
 ## 6. Front end
-- MetaMask connect. Works against the local chain and Sepolia, with network config from env. Shows a warning on the wrong chain.
+- MetaMask connect. Works against the local chain and Sepolia, The RPC URL comes from the environment. The chain ID comes from the generated deployment file (`frontend/src/deployment.json`). Shows a warning on the wrong chain.
 - **Bid form**: an ETH amount box, a max-price box (with a "buy at any price" shortcut that sets it to P0), and a Bid button. Shows a live preview of the snapped step price and whether the bid is live or standing.
 - **Price line chart**: the full stepped schedule P0 → R with a "now" marker; a demand overlay line (`D(k)·1e18/S`, the price at which current demand buys all supply); the standing-order ladder (ETH waiting at each future step); and the clearing point highlighted after finalize.
 - **Status panel**: state, current price, countdown to the next step and to the end, ETH committed, % of supply covered at the current price.
@@ -98,7 +98,7 @@ Example params where useful: `S = 1000e18`, `P0 = 1 ETH`, `R = 0.1 ETH`, `Δ = 3
 
 **Deployment and start**
 1. Given valid params, when deployed, then the token supply = S, held entirely by the auction, the owner = deployer, and state = Created.
-2. Given `P0 ≤ R`, or `R = 0`, or `S = 0`, or `minBid = 0`, or `1200 % Δ ≠ 0`, or `N < 2`, or `N > 120`, when deployed, then it reverts.
+2. Given `P0 ≤ R`, or `R = 0`, or `S = 0`, or `minBid = 0`, or `1200 % Δ ≠ 0`, or `N < 2`, or `N > 120`, or `S > 1e30`, or `P0 > 1e24`, when deployed, then it reverts.
 3. Given Created, when a non-owner calls `startAuction`, then it reverts. When the owner calls it, then `T0 = block.timestamp`, `END = T0+1200`, state = Active, and `AuctionStarted` is emitted.
 4. Given Active, when `startAuction` is called again, then it reverts.
 5. Given Created, when `bid` is called, then it reverts.

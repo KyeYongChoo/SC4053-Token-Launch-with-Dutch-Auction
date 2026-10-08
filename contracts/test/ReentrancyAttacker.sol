@@ -13,6 +13,7 @@ contract ReentrancyAttacker {
     uint256 public maxReentries;
     uint256 public reentries;
     bool public lastReentryOk;
+    bytes public lastReentryReturn; // revert data of the last re-entrant call, so tests can see why it failed
 
     function deployDutch(
         string memory name_,
@@ -55,8 +56,9 @@ contract ReentrancyAttacker {
     receive() external payable {
         if (reentries < maxReentries && callback.length > 0) {
             reentries++;
-            (bool ok, ) = victim.call(callback);
+            (bool ok, bytes memory ret) = victim.call(callback);
             lastReentryOk = ok;
+            lastReentryReturn = ret;
         }
     }
 }

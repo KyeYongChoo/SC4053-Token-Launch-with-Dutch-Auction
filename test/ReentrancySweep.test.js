@@ -4,6 +4,8 @@ const { loadFixture, time } = require("@nomicfoundation/hardhat-network-helpers"
 
 // Review test (PR #19). AC47 is titled "every ETH-sending path", but test/Reentrancy.test.js
 // never re-enters sweep(), which also sends ETH. This closes that gap.
+// Limit: sweep() sets state to Swept before paying, so this test would also pass without the
+// guard. It shows the payout happens once. The guard itself is proven by test/ReentrancyGuard.test.js.
 
 const ETH = (v) => ethers.parseEther(v);
 const SUPPLY = ETH("100");

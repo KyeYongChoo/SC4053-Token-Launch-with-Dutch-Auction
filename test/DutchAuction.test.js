@@ -224,6 +224,16 @@ describe("DutchAuction", function () {
       expect(await auction.clearingPrice()).to.equal(ETH("1.1"));
     });
 
+    it("AC16: a bid after a lazily detected sell-out reverts, and the sell-out is only recorded by that call", async function () {
+      const { auction, alice, bob, t0 } = await loadFixture(startedFixture);
+      await auction.connect(alice).bid(START_PRICE, { value: ETH("115") }); // sells out at step 18 with no transaction
+      await time.increaseTo(at(t0, 18, 1n));
+      expect(await auction.soldOut()).to.equal(false); // not recorded yet: nobody has advanced the scan
+      expect(await auction.isEnded()).to.equal(true); // but the view already reports the sell-out
+      await expect(auction.connect(bob).bid(START_PRICE, { value: MIN_BID })).to.be.revertedWith("sold out");
+      expect(await auction.soldOut()).to.equal(false); // the reverted call rolls back its recording
+    });
+
     it("AC21: a standing order that joins at the boundary step can complete the sell-out", async function () {
       const { auction, alice, eve, t0 } = await loadFixture(startedFixture);
       await auction.connect(alice).bid(START_PRICE, { value: ETH("105") }); // not enough for step 18 alone

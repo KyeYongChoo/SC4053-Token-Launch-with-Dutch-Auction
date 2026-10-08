@@ -11,6 +11,11 @@ const STEP = 60n;
 const MIN_BID = ETH("0.01");
 const WINDOW = 1200n;
 
+// Re-entry must fail because of the nonReentrant guard, not for an unrelated reason
+// (e.g. "nothing to claim"). The guard reverts with this selector.
+const GUARD_SELECTOR = ethers.id("ReentrancyGuardReentrantCall()").slice(0, 10);
+const isGuardRevert = (data) => ethers.hexlify(data).slice(0, 10) === GUARD_SELECTOR;
+
 async function fixture() {
   const [owner, alice, bob, carol] = await ethers.getSigners();
   const attacker = await (await ethers.getContractFactory("ReentrancyAttacker")).deploy();
@@ -64,6 +69,7 @@ describe("Reentrancy", function () {
       );
       expect(await attacker.reentries()).to.equal(1n);
       expect(await attacker.lastReentryOk()).to.equal(false);
+      expect(isGuardRevert(await attacker.lastReentryReturn())).to.equal(true); // guard: nonReentrant on claim
     });
 
     it("cancelBid refund: re-entering cancelBid is rejected; refund paid once", async function () {
@@ -81,9 +87,10 @@ describe("Reentrancy", function () {
         ETH("5")
       );
       expect(await attacker.lastReentryOk()).to.equal(false);
+      expect(isGuardRevert(await attacker.lastReentryReturn())).to.equal(true); // guard: nonReentrant on cancelBid
     });
 
-    it("withdrawProceeds: re-entering withdrawProceeds or claim from the owner's receive() is rejected", async function () {
+    it("withdrawProceeds: re-entering withdrawProceeds from the owner's receive() is rejected", async function () {
       const { attacker, bob } = await loadFixture(fixture);
       await attacker.deployDutch("Launch", "LCH", SUPPLY, START_PRICE, RESERVE, STEP, MIN_BID);
       const auction = await ethers.getContractAt("DutchAuction", await attacker.victim());
@@ -101,6 +108,7 @@ describe("Reentrancy", function () {
         attacker.execute(auction.interface.encodeFunctionData("withdrawProceeds"), 0)
       ).to.changeEtherBalance(attackerAddr, proceeds);
       expect(await attacker.lastReentryOk()).to.equal(false);
+      expect(isGuardRevert(await attacker.lastReentryReturn())).to.equal(true); // guard: nonReentrant on withdrawProceeds
     });
   });
 });

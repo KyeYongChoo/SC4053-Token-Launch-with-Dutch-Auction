@@ -25,15 +25,18 @@ import {
   previewBid,
   quoteBid,
   readContract,
+  readProvider,
   writeContract,
 } from "./auction.js";
 
 const POLL_MS = 2000;
 
 export default function App() {
-  const contract = useMemo(() => readContract(), []);
+  // No contract without a deployment: the placeholder address is null and Contract() would throw.
+  const contract = useMemo(() => (DEPLOYMENT.address ? readContract() : null), []);
   const [account, setAccount] = useState("");
   const [chainId, setChainId] = useState(null);
+  const [rpcChainId, setRpcChainId] = useState(null);
   const [snap, setSnap] = useState(null);
   const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState("");
@@ -41,6 +44,7 @@ export default function App() {
   const [, setTick] = useState(0);
 
   const refresh = useCallback(async () => {
+    if (!contract) return;
     try {
       setSnap(await loadSnapshot(contract, account || null));
       setLoadError("");
@@ -54,6 +58,14 @@ export default function App() {
     const id = setInterval(refresh, POLL_MS);
     return () => clearInterval(id);
   }, [refresh]);
+
+  // The read-only RPC decides what the page shows. Check it is on the expected chain.
+  useEffect(() => {
+    readProvider
+      .getNetwork()
+      .then((n) => setRpcChainId(Number(n.chainId)))
+      .catch(() => setRpcChainId(null));
+  }, []);
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
@@ -76,10 +88,14 @@ export default function App() {
 
   const connect = async () => {
     if (!window.ethereum) return setNotice("Install MetaMask to place bids.");
-    const provider = new BrowserProvider(window.ethereum);
-    const [first] = await provider.send("eth_requestAccounts", []);
-    setAccount(first);
-    setChainId(Number((await provider.getNetwork()).chainId));
+    try {
+      const provider = new BrowserProvider(window.ethereum);
+      const [first] = await provider.send("eth_requestAccounts", []);
+      setAccount(first);
+      setChainId(Number((await provider.getNetwork()).chainId));
+    } catch (e) {
+      setNotice(`Could not connect the wallet: ${e.shortMessage ?? e.message}`);
+    }
   };
 
   const switchNetwork = async () => {
@@ -96,7 +112,15 @@ export default function App() {
   const wrongNetwork = Boolean(account) && chainId !== null && chainId !== DEPLOYMENT.chainId;
   const canAct = Boolean(account) && !wrongNetwork && !busy;
 
-  const signed = async () => writeContract(await new BrowserProvider(window.ethereum).getSigner());
+  // Check the wallet's chain at the moment of sending, not only when the account connected.
+  const signed = async () => {
+    const provider = new BrowserProvider(window.ethereum);
+    const network = await provider.getNetwork();
+    if (Number(network.chainId) !== DEPLOYMENT.chainId) {
+      throw new Error(`Wallet is on chain ${network.chainId}. Switch to chain ${DEPLOYMENT.chainId} first.`);
+    }
+    return writeContract(await provider.getSigner());
+  };
 
   const run = async (label, send) => {
     setBusy(label);
@@ -159,6 +183,11 @@ export default function App() {
           <button onClick={switchNetwork}>Switch network</button>
         </div>
       )}
+      {rpcChainId !== null && rpcChainId !== DEPLOYMENT.chainId && (
+        <div className="banner warn">
+          The read-only RPC is on chain {rpcChainId}, not {DEPLOYMENT.chainId}. The figures shown may be wrong.
+        </div>
+      )}
       {loadError && <div className="banner warn">Could not read the chain: {loadError}</div>}
       {notice && <div className="banner">{notice}</div>}
 
@@ -167,6 +196,17 @@ export default function App() {
       ) : (
         <>
           <StatusPanel snap={snap} chainNow={chainNow} />
+          {snap.state === 1 && snap.ended && (
+            // SPEC section 6: visible to everyone once the auction has ended, wallet or not.
+            <section className="card">
+              <h2>Finalize</h2>
+              <p className="muted">The auction has ended. Anyone can finalize it to record the clearing result.</p>
+              <button className="primary" onClick={() => run("Finalize", (c) => c.finalize())} disabled={!canAct}>
+                Finalize
+              </button>
+              {!account && <p className="muted small">Connect a wallet to finalize.</p>}
+            </section>
+          )}
           <PriceChart snap={snap} />
           <div className="grid2">
             <BidForm snap={snap} disabled={!canAct || snap.state !== 1 || snap.ended} onBid={(amt, max) =>
@@ -180,7 +220,6 @@ export default function App() {
             canAct={canAct}
             onCancel={(id) => run("Cancel", (c) => c.cancelBid(id))}
             onClaim={() => run("Claim", (c) => c.claim())}
-            onFinalize={() => run("Finalize", (c) => c.finalize())}
           />
           <BidFeed snap={snap} />
         </>
@@ -208,7 +247,7 @@ function StatusPanel({ snap, chainNow }) {
     <section className="card">
       <h2>{headline}</h2>
       <div className="stats">
-        <Stat label="Current step" value={`${cur + 1} of ${snap.stepCount}`} />
+        <Stat label="Current step" value={`${cur} of ${snap.stepCount - 1}`} />
         <Stat label="Current price" value={`${fmtEth(snap.prices[cur])} ETH / token`} />
         <Stat label="Reserve price" value={`${fmtEth(snap.reservePrice)} ETH / token`} />
         <Stat label="Total committed" value={`${fmtEth(snap.demand[snap.stepCount - 1])} ETH`} />
@@ -335,10 +374,10 @@ function BidForm({ snap, disabled, onBid }) {
         {err ? (
           <span className="warn-text">{err}</span>
         ) : preview.live ? (
-          <span>Live bid at step {preview.step + 1} (current price). It counts immediately.</span>
+          <span>Live bid at step {preview.step} (current price). It counts immediately.</span>
         ) : (
           <span>
-            Standing order: activates at step {preview.step + 1} when the price is {fmtEth(preview.price)} ETH. It can be cancelled until then.
+            Standing order: activates at step {preview.step} when the price is {fmtEth(preview.price)} ETH. It can be cancelled until then.
           </span>
         )}
       </div>
@@ -350,7 +389,7 @@ function BidForm({ snap, disabled, onBid }) {
   );
 }
 
-function MyBids({ snap, account, canAct, onCancel, onClaim, onFinalize }) {
+function MyBids({ snap, account, canAct, onCancel, onClaim }) {
   if (!account) return <section className="card"><h2>My bids</h2><p className="muted">Connect a wallet to see your bids.</p></section>;
 
   const finalized = snap.state >= 2 && snap.clearing.price > 0n;
@@ -362,9 +401,6 @@ function MyBids({ snap, account, canAct, onCancel, onClaim, onFinalize }) {
       <div className="row between">
         <h2>My bids</h2>
         <div className="row">
-          {snap.state === 1 && snap.ended && (
-            <button onClick={onFinalize} disabled={!canAct}>Finalize</button>
-          )}
           {claimable && (
             <button className="primary" onClick={onClaim} disabled={!canAct}>
               Claim tokens and refunds
@@ -396,7 +432,7 @@ function MyBids({ snap, account, canAct, onCancel, onClaim, onFinalize }) {
                 if (b.cancelled) status = "Cancelled";
                 else if (b.claimed) status = "Claimed";
                 else if (snap.state === 1 && !snap.ended && b.effectiveStep === snap.cur) status = "Live";
-                else if (snap.state === 1 && !snap.ended) status = `Standing from step ${b.effectiveStep + 1}`;
+                else if (snap.state === 1 && !snap.ended) status = `Standing from step ${b.effectiveStep}`;
                 else status = "Settled at clearing";
                 return (
                   <tr key={b.id}>
@@ -477,8 +513,8 @@ function BidFeed({ snap }) {
                   <td className="mono">{b.bidder.slice(0, 6)}...{b.bidder.slice(-4)}</td>
                   <td>{fmtEth(b.ethAmount)}</td>
                   <td>{fmtEth(b.maxPrice)}</td>
-                  <td>{b.placedStep + 1}</td>
-                  <td>{b.effectiveStep + 1}</td>
+                  <td>{b.placedStep}</td>
+                  <td>{b.effectiveStep}</td>
                   <td>{b.cancelled ? "Cancelled" : "Active"}</td>
                 </tr>
               ))}

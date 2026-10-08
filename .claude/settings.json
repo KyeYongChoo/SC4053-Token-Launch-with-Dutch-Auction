@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx hardhat test"
+            "command": "npx --no-install hardhat test"
           }
         ]
       }

@@ -7,3 +7,5 @@ typechain-types/
 frontend/node_modules/
 frontend/dist/
 frontend/.env.local
+.venv-slither/
+.npm-cache/

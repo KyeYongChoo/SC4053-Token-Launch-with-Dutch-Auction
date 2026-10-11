@@ -1,0 +1,352 @@
+[
+  {
+    "id": "b08a2cf67999862d0b55bf8794263f6bbe79f51307bbc526aa0b3bbc35be55b1",
+    "description": "",
+    "check": "arbitrary-send-eth",
+    "impact": "High",
+    "classification": "False positive",
+    "comment": "SL-02: Private helper: cancelBid pays msg.sender after checking bid ownership; claim quotes only _bidIdsOf[msg.sender]; withdrawProceeds and sweep are onlyOwner and pay owner(). Amounts come from accounting, not arbitrary caller parameters. AC32, AC38, AC42, AC43 and AC47 cover these paths.",
+    "risk_register": "R4, R5",
+    "reviewed_description": "DutchAuction._sendEth(address,uint256) (contracts/DutchAuction.sol#465-469) sends eth to arbitrary user\n\tDangerous calls:\n\t- (ok,None) = address(to).call{value: amount}() (contracts/DutchAuction.sol#467)\n"
+  },
+  {
+    "id": "20c302fa0a1169aee913f429dbbd7bb25b813b34650dce9b90b1b6a5534ee271",
+    "description": "",
+    "check": "incorrect-exp",
+    "impact": "High",
+    "classification": "False positive",
+    "comment": "SL-03: OpenZeppelin 5.0.2 Math.mulDiv intentionally uses XOR to seed the inverse modulo 2^256, then refines it using Newton-Raphson; exponentiation would break the algorithm. Pinned dependency source comments explain the seed. AC28 and AC45 exercise rounding/solvency.",
+    "risk_register": "R1",
+    "reviewed_description": "Math.mulDiv(uint256,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#123-202) has bitwise-xor operator ^ instead of the exponentiation operator **: \n\t - inverse = (3 * denominator) ^ 2 (node_modules/@openzeppelin/contracts/utils/math/Math.sol#184)\n"
+  },
+  {
+    "id": "0a0ad25c757ad0de1b7399bb733429fb17ec8f238cf096bab6073e71d3d5cd93",
+    "description": "",
+    "check": "divide-before-multiply",
+    "impact": "Medium",
+    "classification": "False positive",
+    "comment": "SL-05: OpenZeppelin Math.mulDiv first subtracts the remainder, so division by the factored power of two is exact. The subsequent multiplication seeds/refines the inverse modulo 2^256, not ordinary arithmetic on a truncated quotient. Pinned 5.0.2 source comments explain the algorithm; AC28 and AC45 exercise rounding/solvency.",
+    "risk_register": "R1",
+    "reviewed_description": "Math.mulDiv(uint256,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#123-202) performs a multiplication on the result of a division:\n\t- denominator = denominator / twos (node_modules/@openzeppelin/contracts/utils/math/Math.sol#169)\n\t- inverse *= 2 - denominator * inverse (node_modules/@openzeppelin/contracts/utils/math/Math.sol#192)\n"
+  },
+  {
+    "id": "24c95aae6df9e42d1d99499041d1e8f3638e497621faffadd698febfe3d0a6b1",
+    "description": "",
+    "check": "divide-before-multiply",
+    "impact": "Medium",
+    "classification": "False positive",
+    "comment": "SL-06: OpenZeppelin Math.mulDiv first subtracts the remainder, so division by the factored power of two is exact. The subsequent multiplication seeds/refines the inverse modulo 2^256, not ordinary arithmetic on a truncated quotient. Pinned 5.0.2 source comments explain the algorithm; AC28 and AC45 exercise rounding/solvency.",
+    "risk_register": "R1",
+    "reviewed_description": "Math.mulDiv(uint256,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#123-202) performs a multiplication on the result of a division:\n\t- denominator = denominator / twos (node_modules/@openzeppelin/contracts/utils/math/Math.sol#169)\n\t- inverse *= 2 - denominator * inverse (node_modules/@openzeppelin/contracts/utils/math/Math.sol#190)\n"
+  },
+  {
+    "id": "5b089250565ba35f198a4e14b93901d57714230e26bf061d2ce7f49a3e4ffe86",
+    "description": "",
+    "check": "divide-before-multiply",
+    "impact": "Medium",
+    "classification": "False positive",
+    "comment": "SL-07: OpenZeppelin Math.mulDiv first subtracts the remainder, so division by the factored power of two is exact. The subsequent multiplication seeds/refines the inverse modulo 2^256, not ordinary arithmetic on a truncated quotient. Pinned 5.0.2 source comments explain the algorithm; AC28 and AC45 exercise rounding/solvency.",
+    "risk_register": "R1",
+    "reviewed_description": "Math.mulDiv(uint256,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#123-202) performs a multiplication on the result of a division:\n\t- denominator = denominator / twos (node_modules/@openzeppelin/contracts/utils/math/Math.sol#169)\n\t- inverse = (3 * denominator) ^ 2 (node_modules/@openzeppelin/contracts/utils/math/Math.sol#184)\n"
+  },
+  {
+    "id": "63c4e085b9add14db12ee1ce4f8221e502ed9fa4eac96fd67d49330553c18eed",
+    "description": "",
+    "check": "divide-before-multiply",
+    "impact": "Medium",
+    "classification": "False positive",
+    "comment": "SL-08: OpenZeppelin Math.mulDiv first subtracts the remainder, so division by the factored power of two is exact. The subsequent multiplication seeds/refines the inverse modulo 2^256, not ordinary arithmetic on a truncated quotient. Pinned 5.0.2 source comments explain the algorithm; AC28 and AC45 exercise rounding/solvency.",
+    "risk_register": "R1",
+    "reviewed_description": "Math.mulDiv(uint256,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#123-202) performs a multiplication on the result of a division:\n\t- denominator = denominator / twos (node_modules/@openzeppelin/contracts/utils/math/Math.sol#169)\n\t- inverse *= 2 - denominator * inverse (node_modules/@openzeppelin/contracts/utils/math/Math.sol#191)\n"
+  },
+  {
+    "id": "cb2adaac50961dfadafd9142235117c5840aab047b9a27c23d73a915f50e33e1",
+    "description": "",
+    "check": "divide-before-multiply",
+    "impact": "Medium",
+    "classification": "False positive",
+    "comment": "SL-09: OpenZeppelin Math.mulDiv first subtracts the remainder, so division by the factored power of two is exact. The subsequent multiplication seeds/refines the inverse modulo 2^256, not ordinary arithmetic on a truncated quotient. Pinned 5.0.2 source comments explain the algorithm; AC28 and AC45 exercise rounding/solvency.",
+    "risk_register": "R1",
+    "reviewed_description": "Math.mulDiv(uint256,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#123-202) performs a multiplication on the result of a division:\n\t- denominator = denominator / twos (node_modules/@openzeppelin/contracts/utils/math/Math.sol#169)\n\t- inverse *= 2 - denominator * inverse (node_modules/@openzeppelin/contracts/utils/math/Math.sol#188)\n"
+  },
+  {
+    "id": "d36d8b2429a55b69499dd5568474151025b1ebb83693d3b2245920e743ea36f7",
+    "description": "",
+    "check": "divide-before-multiply",
+    "impact": "Medium",
+    "classification": "False positive",
+    "comment": "SL-10: OpenZeppelin Math.mulDiv first subtracts the remainder, so division by the factored power of two is exact. The subsequent multiplication computes the final quotient using the modular inverse, not ordinary arithmetic on a truncated quotient. Pinned 5.0.2 source comments explain the algorithm; AC28 and AC45 exercise rounding/solvency.",
+    "risk_register": "R1",
+    "reviewed_description": "Math.mulDiv(uint256,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#123-202) performs a multiplication on the result of a division:\n\t- prod0 = prod0 / twos (node_modules/@openzeppelin/contracts/utils/math/Math.sol#172)\n\t- result = prod0 * inverse (node_modules/@openzeppelin/contracts/utils/math/Math.sol#199)\n"
+  },
+  {
+    "id": "d9546735d313ee15e82db1bdd88ad70a97cbc60d7af1505be67dc261d342db32",
+    "description": "",
+    "check": "divide-before-multiply",
+    "impact": "Medium",
+    "classification": "False positive",
+    "comment": "SL-11: OpenZeppelin Math.mulDiv first subtracts the remainder, so division by the factored power of two is exact. The subsequent multiplication seeds/refines the inverse modulo 2^256, not ordinary arithmetic on a truncated quotient. Pinned 5.0.2 source comments explain the algorithm; AC28 and AC45 exercise rounding/solvency.",
+    "risk_register": "R1",
+    "reviewed_description": "Math.mulDiv(uint256,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#123-202) performs a multiplication on the result of a division:\n\t- denominator = denominator / twos (node_modules/@openzeppelin/contracts/utils/math/Math.sol#169)\n\t- inverse *= 2 - denominator * inverse (node_modules/@openzeppelin/contracts/utils/math/Math.sol#193)\n"
+  },
+  {
+    "id": "e520d3ee65b5f2a5093c0bacfa9eff2c729e07636694a0c07309623402fb2d78",
+    "description": "",
+    "check": "divide-before-multiply",
+    "impact": "Medium",
+    "classification": "False positive",
+    "comment": "SL-12: OpenZeppelin Math.mulDiv first subtracts the remainder, so division by the factored power of two is exact. The subsequent multiplication seeds/refines the inverse modulo 2^256, not ordinary arithmetic on a truncated quotient. Pinned 5.0.2 source comments explain the algorithm; AC28 and AC45 exercise rounding/solvency.",
+    "risk_register": "R1",
+    "reviewed_description": "Math.mulDiv(uint256,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#123-202) performs a multiplication on the result of a division:\n\t- denominator = denominator / twos (node_modules/@openzeppelin/contracts/utils/math/Math.sol#169)\n\t- inverse *= 2 - denominator * inverse (node_modules/@openzeppelin/contracts/utils/math/Math.sol#189)\n"
+  },
+  {
+    "id": "37a2edb6073cbb5d7de853d0071d0215d40fe87ecd17324688457fb33f1fa57c",
+    "description": "",
+    "check": "incorrect-equality",
+    "impact": "Medium",
+    "classification": "False positive",
+    "comment": "SL-13: amount == 0 is a zero-payment early return, not equality against a manipulable contract balance. It avoids invoking recipients when nothing is owed. AC27 covers zero proceeds.",
+    "risk_register": "R7",
+    "reviewed_description": "DutchAuction._sendEth(address,uint256) (contracts/DutchAuction.sol#465-469) uses a dangerous strict equality:\n\t- amount == 0 (contracts/DutchAuction.sol#466)\n"
+  },
+  {
+    "id": "3c847002572c77a575c70020124e9f781282b201a9e8d203eb63b80649a58ad3",
+    "description": "",
+    "check": "incorrect-equality",
+    "impact": "Medium",
+    "classification": "False positive",
+    "comment": "SL-14: effectiveStep == clearing.step compares discrete integer step indices and deliberately selects the joiner allocation fraction. AC23, AC24 and AC25 cover joiners and earlier bids.",
+    "risk_register": "R2",
+    "reviewed_description": "DutchAuction._quote(DutchAuction.Bid,DutchAuction.Clearing) (contracts/DutchAuction.sol#449-463) uses a dangerous strict equality:\n\t- b.effectiveStep == k.step (contracts/DutchAuction.sol#455)\n"
+  },
+  {
+    "id": "e5c61c5d74204051f39e658208e67c323dfc3dff4f26df1df719a05c7dd4703f",
+    "description": "",
+    "check": "incorrect-equality",
+    "impact": "Medium",
+    "classification": "False positive",
+    "comment": "SL-15: eff == cur deliberately distinguishes a live bid from a standing order using discrete step indices. AC12-13, AC18 and AC20-21 cover activation and boundaries.",
+    "risk_register": "R2",
+    "reviewed_description": "DutchAuction.bid(uint256) (contracts/DutchAuction.sol#171-209) uses a dangerous strict equality:\n\t- eff == cur (contracts/DutchAuction.sol#199)\n"
+  },
+  {
+    "id": "0ffa946ae1723858298c269d715d56be2e4a4d9574a1a8847af49d79ff04ad1f",
+    "description": "",
+    "check": "uninitialized-local",
+    "impact": "Medium",
+    "classification": "False positive",
+    "comment": "SL-16: Solidity initializes uint256 totalTokens to zero. It accumulates token allocations for only the caller's unclaimed bids. AC38, AC39 and AC45 cover claims and solvency.",
+    "risk_register": "R1, R7",
+    "reviewed_description": "DutchAuction.claim().totalTokens (contracts/DutchAuction.sol#234) is a local variable never initialized\n"
+  },
+  {
+    "id": "75fe77b69375ad15873d0f10a19eeba67afb8397d5b3711f51c91fe429aa6fee",
+    "description": "",
+    "check": "uninitialized-local",
+    "impact": "Medium",
+    "classification": "False positive",
+    "comment": "SL-17: Solidity initializes uint256 count to zero. It increments for each settled bid and count > 0 rejects empty claims. AC38 and AC39 cover repeated/empty claims.",
+    "risk_register": "R7",
+    "reviewed_description": "DutchAuction.claim().count (contracts/DutchAuction.sol#236) is a local variable never initialized\n"
+  },
+  {
+    "id": "92569518b38cc05087b73fbdefbcb29ea9d1eb2679797577c82b2a28eff8d710",
+    "description": "",
+    "check": "uninitialized-local",
+    "impact": "Medium",
+    "classification": "False positive",
+    "comment": "SL-18: Solidity initializes uint256 totalRefund to zero. It accumulates the caller's bid ETH minus rounded charges. AC28, AC38 and AC45 cover refunds and solvency.",
+    "risk_register": "R1, R7",
+    "reviewed_description": "DutchAuction.claim().totalRefund (contracts/DutchAuction.sol#235) is a local variable never initialized\n"
+  },
+  {
+    "id": "895e808115862c19b6dd55038752b7827104f539f1321b616e84c1562de06469",
+    "description": "",
+    "check": "reentrancy-benign",
+    "impact": "Low",
+    "classification": "False positive",
+    "comment": "SL-20: The reported pre-accounting call is token.burn during auto-finalization. token is immutable and constructed as LaunchToken; pinned OpenZeppelin ERC20 burn only updates balances and emits Transfer, with no callback. withdrawProceeds is nonReentrant and sets proceedsWithdrawn before the ETH call. AC42 and owner/mixed-role AC47 tests cover payout protection.",
+    "risk_register": "R5, R7",
+    "reviewed_description": "Reentrancy in DutchAuction.withdrawProceeds() (contracts/DutchAuction.sol#145-153):\n\tExternal calls:\n\t- _ensureFinalized() (contracts/DutchAuction.sol#146)\n\t\t- token.burn(burned) (contracts/DutchAuction.sol#435)\n\tState variables written after the call(s):\n\t- proceedsWithdrawn = true (contracts/DutchAuction.sol#149)\n"
+  },
+  {
+    "id": "9da81f72c106efe74b0fd3327dc3496548e64d6883f303d29dfe06cf2dd3d69f",
+    "description": "",
+    "check": "reentrancy-benign",
+    "impact": "Low",
+    "classification": "False positive",
+    "comment": "SL-21: The reported pre-claimed call is the immutable LaunchToken burn during auto-finalization, which has no callback. claim is nonReentrant and marks all bids claimed before token transfer or ETH refund. AC37, AC38 and claim/mixed-role AC47 tests cover it.",
+    "risk_register": "R5, R7",
+    "reviewed_description": "Reentrancy in DutchAuction.claim() (contracts/DutchAuction.sol#228-252):\n\tExternal calls:\n\t- _ensureFinalized() (contracts/DutchAuction.sol#229)\n\t\t- token.burn(burned) (contracts/DutchAuction.sol#435)\n\tState variables written after the call(s):\n\t- b.claimed = true (contracts/DutchAuction.sol#242)\n"
+  },
+  {
+    "id": "a9855c2e6aa23152ce6e3b88a65540d738ef30a443d0b5be96bf99853eaf556b",
+    "description": "",
+    "check": "reentrancy-events",
+    "impact": "Low",
+    "classification": "False positive",
+    "comment": "SL-22: AuctionFinalized follows a burn on the immutable, constructor-created LaunchToken. Its pinned ERC20 implementation has no external receiver hook, so this call cannot re-enter and reorder auction events. AC26, AC27, AC36 and AC37 cover finalization.",
+    "risk_register": "R5",
+    "reviewed_description": "Reentrancy in DutchAuction._finalize() (contracts/DutchAuction.sol#429-437):\n\tExternal calls:\n\t- token.burn(burned) (contracts/DutchAuction.sol#435)\n\tEvent emitted after the call(s):\n\t- AuctionFinalized(k.step,k.price,k.tokensSold,burned,k.soldOut) (contracts/DutchAuction.sol#436)\n"
+  },
+  {
+    "id": "04f0cbbbf66c82fb55e82fc53a28e21e7a554eb174b369776ce868d7f6846f59",
+    "description": "",
+    "check": "timestamp",
+    "impact": "Low",
+    "classification": "Accepted risk",
+    "comment": "SL-23: claim intentionally permits block.timestamp <= finalizedAt + 30 days. Transactions must be included by the deadline; submission time is not a guarantee. AC40 tests the exact deadline and one second afterward.",
+    "risk_register": "R6, R17",
+    "reviewed_description": "DutchAuction.claim() (contracts/DutchAuction.sol#228-252) uses timestamp for comparisons\n\tDangerous comparisons:\n\t- require(bool,string)(block.timestamp <= finalizedAt + CLAIM_PERIOD,claim period over) (contracts/DutchAuction.sol#231)\n\t- totalTokens > 0 (contracts/DutchAuction.sol#250)\n\t- require(bool,string)(token.transfer(msg.sender,totalTokens),token transfer) (contracts/DutchAuction.sol#250)\n"
+  },
+  {
+    "id": "06f1cce37522991e681b6162b999581cb240df8d8e7fb48384dde9e8601ed78d",
+    "description": "",
+    "check": "timestamp",
+    "impact": "Low",
+    "classification": "Accepted risk",
+    "comment": "SL-24: currentStep intentionally computes elapsed block time and clamps at the last step when timestamp >= endTime. Timing/inclusion near boundaries remains a risk. AC6-8 tests every boundary and END-1.",
+    "risk_register": "R9, R17",
+    "reviewed_description": "DutchAuction.currentStep() (contracts/DutchAuction.sol#269-273) uses timestamp for comparisons\n\tDangerous comparisons:\n\t- block.timestamp >= endTime (contracts/DutchAuction.sol#271)\n"
+  },
+  {
+    "id": "6cfa1b6b61dbaececf76e5596a53656745488112dd42e1fb8a021804a728d44e",
+    "description": "",
+    "check": "timestamp",
+    "impact": "Low",
+    "classification": "Accepted risk",
+    "comment": "SL-25: isEnded intentionally uses the sell-out projection or timestamp >= endTime. It reports chain time, not wall-clock submission time. AC15 and AC35 cover the auction end.",
+    "risk_register": "R10, R17",
+    "reviewed_description": "DutchAuction.isEnded() (contracts/DutchAuction.sol#281-286) uses timestamp for comparisons\n\tDangerous comparisons:\n\t- sold || block.timestamp >= endTime (contracts/DutchAuction.sol#285)\n"
+  },
+  {
+    "id": "7328c4f4b8f34ed05fa11ba119e085aea63da9214dd2821a04f025756fa788a3",
+    "description": "",
+    "check": "timestamp",
+    "impact": "Low",
+    "classification": "Accepted risk",
+    "comment": "SL-26: cancelBid intentionally requires timestamp < endTime and currentStep < effectiveStep. A standing order may become non-cancellable before a pending cancellation is included. AC30 and AC33 cover activation and end boundaries.",
+    "risk_register": "R3, R17",
+    "reviewed_description": "DutchAuction.cancelBid(uint256) (contracts/DutchAuction.sol#212-225) uses timestamp for comparisons\n\tDangerous comparisons:\n\t- require(bool,string)(b.bidder == msg.sender,not your bid) (contracts/DutchAuction.sol#214)\n\t- require(bool,string)(! b.cancelled,already cancelled) (contracts/DutchAuction.sol#215)\n\t- require(bool,string)(! soldOut && block.timestamp < endTime,ended) (contracts/DutchAuction.sol#218)\n\t- require(bool,string)(currentStep() < b.effectiveStep,already live) (contracts/DutchAuction.sol#219)\n"
+  },
+  {
+    "id": "8026ddc9c3fba44f143aced270cd505b81bc4d17b91a5e03e8f4746cd532045f",
+    "description": "",
+    "check": "timestamp",
+    "impact": "Low",
+    "classification": "Accepted risk",
+    "comment": "SL-27: sweep intentionally requires timestamp strictly after the 30-day claim deadline. Owner-only access protects the recipient; timestamp boundary risk remains. AC40 and AC43 test the deadline and sweep eligibility.",
+    "risk_register": "R6, R17",
+    "reviewed_description": "DutchAuction.sweep() (contracts/DutchAuction.sol#156-165) uses timestamp for comparisons\n\tDangerous comparisons:\n\t- require(bool,string)(block.timestamp > finalizedAt + CLAIM_PERIOD,claim period open) (contracts/DutchAuction.sol#158)\n"
+  },
+  {
+    "id": "92e27d8f5de2be99b088988e28899660e5db5afe3fc34c21e59801826b6fc2e0",
+    "description": "",
+    "check": "timestamp",
+    "impact": "Low",
+    "classification": "Accepted risk",
+    "comment": "SL-28: _quote uses the time-derived clearing step to compare discrete effective-step indices. Timing can influence which clearing step applies; allocation at that step is intentional. AC23-25 cover the three allocation cases.",
+    "risk_register": "R2, R17",
+    "reviewed_description": "DutchAuction._quote(DutchAuction.Bid,DutchAuction.Clearing) (contracts/DutchAuction.sol#449-463) uses timestamp for comparisons\n\tDangerous comparisons:\n\t- b.effectiveStep < k.step (contracts/DutchAuction.sol#452)\n\t- b.effectiveStep == k.step (contracts/DutchAuction.sol#455)\n"
+  },
+  {
+    "id": "9fd185c5e907b8f914a35fded0a632c8b1ddd7c66ca20cedb812faf4147e2f5e",
+    "description": "",
+    "check": "timestamp",
+    "impact": "Low",
+    "classification": "Accepted risk",
+    "comment": "SL-29: _scan walks discrete steps through the time-derived current step and compares demand against scheduled prices. Sell-out depends intentionally on chain time. AC18-21 cover exact/near demand and lazy boundary detection.",
+    "risk_register": "R2, R17",
+    "reviewed_description": "DutchAuction._scan(uint256,uint256,uint256) (contracts/DutchAuction.sol#365-375) uses timestamp for comparisons\n\tDangerous comparisons:\n\t- k <= to (contracts/DutchAuction.sol#371)\n\t- total * WAD >= priceAt(k) * supply (contracts/DutchAuction.sol#373)\n"
+  },
+  {
+    "id": "a0ab448dc0f687c6911ab6698e8adb08d5dc0b94a316289c2feb6c313e29859d",
+    "description": "",
+    "check": "timestamp",
+    "impact": "Low",
+    "classification": "Accepted risk",
+    "comment": "SL-30: _finalize burns supply minus tokensSold from time-derived clearing data. The burned > 0 check skips a zero burn; timing can affect clearing but does not grant a callback. AC26, AC27 and AC36 cover finalization.",
+    "risk_register": "R10, R17",
+    "reviewed_description": "DutchAuction._finalize() (contracts/DutchAuction.sol#429-437) uses timestamp for comparisons\n\tDangerous comparisons:\n\t- burned > 0 (contracts/DutchAuction.sol#435)\n"
+  },
+  {
+    "id": "d5fd67b12b73c2155a3b4c4a49fc27e130bcb4847c0447cd63bedaf6ed9c97f6",
+    "description": "",
+    "check": "timestamp",
+    "impact": "Low",
+    "classification": "Accepted risk",
+    "comment": "SL-31: _demandUpTo sums step buckets through the time-derived clearing step. The loop is inclusive by design; this is not timestamp randomness. AC20-25 cover boundary demand and allocation. Public unbounded view input/gas remains tracked separately by R13.",
+    "risk_register": "R2, R13, R17",
+    "reviewed_description": "DutchAuction._demandUpTo(uint256) (contracts/DutchAuction.sol#384-388) uses timestamp for comparisons\n\tDangerous comparisons:\n\t- i <= k (contracts/DutchAuction.sol#385)\n"
+  },
+  {
+    "id": "e0722096f58cd2251056aa4f0ea8bcf26cedf481912edf16b8f42ba1d2087cab",
+    "description": "",
+    "check": "timestamp",
+    "impact": "Low",
+    "classification": "Accepted risk",
+    "comment": "SL-32: priceAt checks a discrete step is below stepCount; the detector propagates timestamp influence from its callers. The deterministic schedule and chain-time dependence are intentional. AC9 tests the full schedule; AC6-8 tests time boundaries.",
+    "risk_register": "R9, R17",
+    "reviewed_description": "DutchAuction.priceAt(uint256) (contracts/DutchAuction.sol#263-266) uses timestamp for comparisons\n\tDangerous comparisons:\n\t- require(bool,string)(k < stepCount,bad step) (contracts/DutchAuction.sol#264)\n"
+  },
+  {
+    "id": "e86335914bceec82dd8b5cf403a63709ce346362bd76dc53928003e33ad78215",
+    "description": "",
+    "check": "timestamp",
+    "impact": "Low",
+    "classification": "Accepted risk",
+    "comment": "SL-33: _computeClearing compares earlier demand with the required ETH at the time-derived clearing step. This implements uniform clearing rather than using time as randomness. AC22-26 cover reserve, oversubscription and allocation.",
+    "risk_register": "R2, R17",
+    "reviewed_description": "DutchAuction._computeClearing() (contracts/DutchAuction.sol#391-426) uses timestamp for comparisons\n\tDangerous comparisons:\n\t- earlier * WAD >= need (contracts/DutchAuction.sol#410)\n"
+  },
+  {
+    "id": "fc6e1c49b40965cd02f94afe1dde996d94d51250ac8cfc2e0fc12f6c2eb0978e",
+    "description": "",
+    "check": "timestamp",
+    "impact": "Low",
+    "classification": "Accepted risk",
+    "comment": "SL-34: _ensureFinalized deliberately requires recorded sell-out or timestamp >= endTime. Permissionless finalization after that condition is intended. AC35, AC37 and AC41 cover early rejection and auto-finalization.",
+    "risk_register": "R10, R17",
+    "reviewed_description": "DutchAuction._ensureFinalized() (contracts/DutchAuction.sol#440-446) uses timestamp for comparisons\n\tDangerous comparisons:\n\t- require(bool,string)(soldOut || block.timestamp >= endTime,not ended) (contracts/DutchAuction.sol#443)\n"
+  },
+  {
+    "id": "fce87baf6320077787c6f517fe562d1920fc25d5fb128c2426f6f9f7fb419f3d",
+    "description": "",
+    "check": "timestamp",
+    "impact": "Low",
+    "classification": "Accepted risk",
+    "comment": "SL-35: bid deliberately rejects timestamp >= endTime and uses the current step/price to activate and fill bids. Block inclusion and transaction ordering near a price boundary can affect execution; no wall-clock price guarantee. AC6-8, AC12-15 and AC18-21 cover specified boundaries.",
+    "risk_register": "R2, R9, R17",
+    "reviewed_description": "DutchAuction.bid(uint256) (contracts/DutchAuction.sol#171-209) uses timestamp for comparisons\n\tDangerous comparisons:\n\t- require(bool,string)(block.timestamp < endTime,ended) (contracts/DutchAuction.sol#173)\n\t- priceAt(eff) > maxPrice (contracts/DutchAuction.sol#182)\n\t- eff == cur (contracts/DutchAuction.sol#199)\n\t- _runningDemand * WAD >= priceAt(cur) * supply (contracts/DutchAuction.sol#202)\n"
+  },
+  {
+    "id": "41cff80b5b39768a3e95ae37d3c658459d898638fc6fbbfefd2b65643b3e7297",
+    "description": "",
+    "check": "assembly",
+    "impact": "Informational",
+    "classification": "Accepted risk",
+    "comment": "SL-36: Pinned OpenZeppelin Math.mulDiv assembly reconstructs the 512-bit product, subtracts the remainder, and divides out powers of two. These blocks operate on local arithmetic values, not arbitrary external calls/storage. AC28 and AC45 exercise rounding/solvency; tests are not a proof of the dependency.",
+    "risk_register": "R1",
+    "reviewed_description": "Math.mulDiv(uint256,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#123-202) uses assembly\n\t- INLINE ASM (node_modules/@openzeppelin/contracts/utils/math/Math.sol#130-133)\n\t- INLINE ASM (node_modules/@openzeppelin/contracts/utils/math/Math.sol#154-161)\n\t- INLINE ASM (node_modules/@openzeppelin/contracts/utils/math/Math.sol#167-176)\n"
+  },
+  {
+    "id": "326bef0efcf924ecba6b98e6c63db27084c982a1bb30a33a3f9b533fdadfea18",
+    "description": "",
+    "check": "solc-version",
+    "impact": "Informational",
+    "classification": "False positive",
+    "comment": "SL-39: The warning concerns versions allowed by ^0.8.20. Actual compilation is 0.8.24: VerbatimInvalidDeduplication was fixed in 0.8.23; FullInlinerNonExpressionSplitArgumentEvaluationOrder and MissingSideEffectsOnSelectorAccess in 0.8.21. Solidity's bug list confirms these fixes; not a claim that all compiler bugs are absent.",
+    "risk_register": "Compiler configuration",
+    "reviewed_description": "Version constraint ^0.8.20 contains known severe issues (https://solidity.readthedocs.io/en/latest/bugs.html)\n\t- VerbatimInvalidDeduplication\n\t- FullInlinerNonExpressionSplitArgumentEvaluationOrder\n\t- MissingSideEffectsOnSelectorAccess.\nIt is used by:\n\t- ^0.8.20 (node_modules/@openzeppelin/contracts/access/Ownable.sol#4)\n\t- ^0.8.20 (node_modules/@openzeppelin/contracts/interfaces/draft-IERC6093.sol#3)\n\t- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC20/ERC20.sol#4)\n\t- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol#4)\n\t- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol#4)\n\t- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol#4)\n\t- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/Context.sol#4)\n\t- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/ReentrancyGuard.sol#4)\n\t- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/math/Math.sol#4)\n"
+  },
+  {
+    "id": "e91fc26d33ef81f9b42ed2eef1642ad8a10f1d21a1445666028c27914dcd09a1",
+    "description": "",
+    "check": "low-level-calls",
+    "impact": "Informational",
+    "classification": "Accepted risk",
+    "comment": "SL-43: Low-level ETH call supports contract recipients without a fixed gas stipend. Success is checked and a failure reverts accounting atomically; all production payment entry points use nonReentrant. A rejecting recipient can prevent its own payout/refund (an owner contract can also block its owner payout). AC29, AC38, AC42-44 and AC47 cover normal payouts and reentry; rejecting-recipient behavior is accepted, not claimed covered.",
+    "risk_register": "R5, R18",
+    "reviewed_description": "Low level call in DutchAuction._sendEth(address,uint256) (contracts/DutchAuction.sol#465-469):\n\t- (ok,None) = address(to).call{value: amount}() (contracts/DutchAuction.sol#467)\n"
+  }
+]

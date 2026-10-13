@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrowserProvider, formatEther, parseEther } from "ethers";
 import {
   Bar,
@@ -42,13 +42,27 @@ export default function App() {
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
   const [, setTick] = useState(0);
+  const refreshGeneration = useRef(0);
 
   const refresh = useCallback(async () => {
     if (!contract) return;
+    const generation = ++refreshGeneration.current;
+    let readChain = null;
+    setRpcChainId(null);
     try {
-      setSnap(await loadSnapshot(contract, account || null));
+      readChain = Number((await readProvider.getNetwork()).chainId);
+      if (generation !== refreshGeneration.current) return;
+      if (readChain !== DEPLOYMENT.chainId) {
+        throw new Error(`RPC network mismatch. Expected chain ${DEPLOYMENT.chainId}. Actions are disabled.`);
+      }
+      const next = await loadSnapshot(contract, account || null);
+      if (generation !== refreshGeneration.current) return;
+      setSnap(next);
+      setRpcChainId(readChain);
       setLoadError("");
     } catch (e) {
+      if (generation !== refreshGeneration.current) return;
+      setRpcChainId(readChain !== DEPLOYMENT.chainId ? readChain : null);
       setLoadError(e.shortMessage ?? e.message);
     }
   }, [contract, account]);
@@ -56,16 +70,11 @@ export default function App() {
   useEffect(() => {
     refresh();
     const id = setInterval(refresh, POLL_MS);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      ++refreshGeneration.current; // Invalidate reads from an old account or unmounted component.
+    };
   }, [refresh]);
-
-  // The read-only RPC decides what the page shows. Check it is on the expected chain.
-  useEffect(() => {
-    readProvider
-      .getNetwork()
-      .then((n) => setRpcChainId(Number(n.chainId)))
-      .catch(() => setRpcChainId(null));
-  }, []);
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
@@ -76,8 +85,18 @@ export default function App() {
   useEffect(() => {
     const eth = window.ethereum;
     if (!eth?.on) return;
-    const onChain = () => window.location.reload();
-    const onAccounts = (accounts) => setAccount(accounts[0] ?? "");
+    const onChain = () => {
+      ++refreshGeneration.current;
+      setChainId(null);
+      setRpcChainId(null);
+      window.location.reload();
+    };
+    const onAccounts = (accounts) => {
+      ++refreshGeneration.current;
+      setRpcChainId(null);
+      setSnap(null);
+      setAccount(accounts[0] ?? "");
+    };
     eth.on("chainChanged", onChain);
     eth.on("accountsChanged", onAccounts);
     return () => {
@@ -88,9 +107,13 @@ export default function App() {
 
   const connect = async () => {
     if (!window.ethereum) return setNotice("Install MetaMask to place bids.");
+    setChainId(null);
     try {
       const provider = new BrowserProvider(window.ethereum);
       const [first] = await provider.send("eth_requestAccounts", []);
+      ++refreshGeneration.current;
+      setRpcChainId(null);
+      setSnap(null);
       setAccount(first);
       setChainId(Number((await provider.getNetwork()).chainId));
     } catch (e) {
@@ -110,12 +133,25 @@ export default function App() {
   };
 
   const wrongNetwork = Boolean(account) && chainId !== null && chainId !== DEPLOYMENT.chainId;
-  const canAct = Boolean(account) && !wrongNetwork && !busy;
+  const canAct = Boolean(account) && chainId === DEPLOYMENT.chainId && rpcChainId === DEPLOYMENT.chainId && !loadError && !busy;
 
-  // Check the wallet's chain at the moment of sending, not only when the account connected.
+  // Recheck both providers before obtaining a signer; invalidate any older reads first.
   const signed = async () => {
+    ++refreshGeneration.current;
+    setRpcChainId(null);
+    const readNetwork = await readProvider.getNetwork();
+    if (Number(readNetwork.chainId) !== DEPLOYMENT.chainId) {
+      throw new Error(`Read-only RPC is on chain ${readNetwork.chainId}. Expected chain ${DEPLOYMENT.chainId}.`);
+    }
     const provider = new BrowserProvider(window.ethereum);
-    const network = await provider.getNetwork();
+    let network;
+    try {
+      network = await provider.getNetwork();
+      setChainId(Number(network.chainId));
+    } catch (e) {
+      setChainId(null);
+      throw e;
+    }
     if (Number(network.chainId) !== DEPLOYMENT.chainId) {
       throw new Error(`Wallet is on chain ${network.chainId}. Switch to chain ${DEPLOYMENT.chainId} first.`);
     }
@@ -185,7 +221,7 @@ export default function App() {
       )}
       {rpcChainId !== null && rpcChainId !== DEPLOYMENT.chainId && (
         <div className="banner warn">
-          The read-only RPC is on chain {rpcChainId}, not {DEPLOYMENT.chainId}. The figures shown may be wrong.
+          The read-only RPC is on chain {rpcChainId}, not {DEPLOYMENT.chainId}. Actions are disabled.
         </div>
       )}
       {loadError && <div className="banner warn">Could not read the chain: {loadError}</div>}

@@ -87,7 +87,8 @@ Ended ──finalize() / auto──▶ Finalized ──now > finalizedAt+30d, sw
 - **Swept**: views only.
 
 ## 6. Front end
-- MetaMask connect. Works against the local chain and Sepolia. The RPC URL comes from the environment. The chain ID comes from the generated deployment file (`frontend/src/deployment.json`). Shows a warning on the wrong chain.
+- MetaMask connect. Works against the local chain and Sepolia. The RPC URL comes from the environment. The chain ID comes from the generated deployment file (`frontend/src/deployment.json`). Transaction actions require both the wallet and read RPC to match that chain, a successful current snapshot and no pending transaction. Unknown, mismatched or failed network/read checks disable actions. Both providers are checked again before obtaining the signer. Shows a warning on the wrong chain.
+- **Data refreshes**: capture one latest block, use its number for every contract read and as the upper bound for event queries, and use its timestamp for chain-time eligibility. An unavailable block fails the refresh. Bid IDs remain exact decimal strings through display and cancellation. Only the latest refresh for the current account may publish data or restore action readiness; older responses and responses invalidated by account/network changes or signing checks are ignored. Block-number pinning does not guarantee consistency across reorgs.
 - **Bid form**: an ETH amount box, a max-price box (with a "buy at any price" shortcut that sets it to P0), and a Bid button. Shows a live preview of the snapped step price and whether the bid is live or standing.
 - **Price line chart**: the full stepped schedule P0 → R with a "now" marker; a demand overlay line (`D(k)·1e18/S`, the price at which current demand buys all supply); the standing-order ladder (ETH waiting at each future step); and the clearing point highlighted after finalize.
 - **Status panel**: state, current price, countdown to the next step and to the end, ETH committed, % of supply covered at the current price.
@@ -164,7 +165,7 @@ Example params where useful: `S = 1000e18`, `P0 = 1 ETH`, `R = 0.1 ETH`, `Δ = 3
 47. Given the real `DutchAuction`, when the attacker re-enters `claim`, `cancelBid`, `withdrawProceeds` or `sweep` from `receive()`, then the re-entrant call reverts and balances stay correct.
 
 **Front end**
-48. Given a wallet on the wrong chain, then the UI shows a switch-network prompt and disables actions.
+48. Given a wallet on the wrong chain, then the UI shows a switch-network prompt and disables actions. Actions also remain disabled unless the read RPC matches the deployment chain and a current snapshot was read successfully. A changed or failed provider check before signing prevents transaction submission; stale refresh responses cannot restore readiness.
 49. Given Active, then the chart shows all N steps, a "now" marker, a demand line and a standing-order ladder, refreshed on new events or every step.
 50. Given a max price entered below the current price, then the form labels the bid "standing order at step j, price X".
 51. Given Finalized, then the chart marks the clearing point, My bids shows the exact claimable tokens and refund, and the deadline is displayed. With outstanding bids, Claim is available when the chain snapshot timestamp is at or before the deadline; afterward it is hidden and expiry/sweep eligibility is explained.

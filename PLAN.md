@@ -39,6 +39,8 @@ Each risk names the test that covers it. A risk with no test is marked **gap** a
 | R15 | Token dust remains in the auction after claims | Minor leftover balance | `AC28: rounding never overpays...` (token dust at most 3 token-wei), `AC45 (solvency)...` | Covered |
 | C02 | Constructor accepts a price spread too small for strictly decreasing integer prices | Schedule violates AC9 | `test/AuditC02C03.test.js`: four AC2 rejection cases and six AC9 boundary schedules (2, 20 and 120 steps) | Fixed; regressions verified locally |
 | C03 | Ownership changes during proceeds payout and the event names the new owner instead of the recipient | Incorrect event-based payout attribution | `test/AuditC02C03.test.js`: AC42 callback transfers with explicit/automatic finalization, ordinary payout, transfer-before-payout and zero proceeds | Fixed; regressions verified locally |
+| U01 | Activated bids become mislabeled Standing as the current step advances | Bidders misunderstand their commitment | `frontend/src/AuditU01U02.test.jsx`: five status/cancellation cases | Fixed; regressions verified locally |
+| U02 | Claim remains offered after its deadline | Users attempt transactions that revert | `frontend/src/AuditU01U02.test.jsx`: nine claim cases, including chain deadline boundaries, browser clock disagreement, unfinalized/swept states and no outstanding bids | Fixed; regressions verified locally |
 
 ## Verification
 
@@ -52,3 +54,9 @@ Each risk names the test that covers it. A risk with no test is marked **gap** a
 On `fix/audit-c02-c03`, based on `617c02ca9a9d8dff1498ddcd1afa62bbbec95ff3`, the original contract suite passed 57 tests. The 15 new C02/C03 regressions then produced 9 passes and 6 expected failures against unchanged contract code (four accepted invalid price spreads and two incorrect payout-event recipients). After the scoped fixes, all 15 regressions and the full 72-test contract suite passed. The evidence runner executes the same Hardhat `test` command as `npm test`; exact commands, input hashes, exit codes and output are retained locally under `evidence/audit-c02-c03/2026-10-13/` and are excluded from the commit.
 
 These are actual local Windows/Node 22.20.0 results, not hypothetical results from the supplied audit report or a new CI run on Node 20. Frontend tests/builds, gas measurements and Slither were not run for this change.
+
+### U01/U02 independent verification (2026-10-13)
+
+Based on C02/C03 commit `297325e9a00359b0ebfb79661d9e380524c7a1e6`, the original frontend suite passed 17 tests. The 14 new U01/U02 rendering regressions produced 11 passes and 3 expected failures on unchanged frontend code: one incorrect Standing label and two expired Claim actions. The same tests passed after the fixes; the full frontend suite passed 31 tests and the production build succeeded. The existing contract deadline checks (AC40/AC43) passed all 3 tests. These results were executed locally on Windows/Node 22.20.0; UI chain and wallet data were mocked. Raw logs, source snapshots, input hashes and report corrections are retained locally under `evidence/audit-u01-u02/2026-10-13/` and are excluded from the commit.
+
+U02 uses only the chain snapshot timestamp for claim eligibility, including the exact deadline; browser time remains limited to existing countdown estimates. Eligibility may become stale between refreshes or before transaction inclusion, and the contract remains authoritative. U03/U04 read-chain and snapshot-consistency work remains separate.

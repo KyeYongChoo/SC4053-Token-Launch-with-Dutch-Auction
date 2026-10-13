@@ -394,7 +394,8 @@ function MyBids({ snap, account, canAct, onCancel, onClaim }) {
 
   const finalized = snap.state >= 2 && snap.clearing.price > 0n;
   const hasClaimable = snap.myBids.some((b) => !b.cancelled && !b.claimed);
-  const claimable = hasClaimable && (snap.state === 2 || (snap.state === 1 && snap.ended)) && snap.state !== 3;
+  const claimExpired = snap.state === 2 && snap.chainNow > snap.claimDeadline;
+  const claimable = hasClaimable && ((snap.state === 2 && !claimExpired) || (snap.state === 1 && snap.ended));
 
   return (
     <section className="card">
@@ -408,6 +409,9 @@ function MyBids({ snap, account, canAct, onCancel, onClaim }) {
           )}
         </div>
       </div>
+      {hasClaimable && claimExpired && (
+        <p className="muted">Claim period has expired; unclaimed tokens and ETH may be swept by the owner.</p>
+      )}
       {snap.myBids.length === 0 ? (
         <p className="muted">You have no bids in this auction.</p>
       ) : (
@@ -431,7 +435,7 @@ function MyBids({ snap, account, canAct, onCancel, onClaim }) {
                 let status;
                 if (b.cancelled) status = "Cancelled";
                 else if (b.claimed) status = "Claimed";
-                else if (snap.state === 1 && !snap.ended && b.effectiveStep === snap.cur) status = "Live";
+                else if (snap.state === 1 && !snap.ended && b.effectiveStep <= snap.cur) status = "Live";
                 else if (snap.state === 1 && !snap.ended) status = `Standing from step ${b.effectiveStep}`;
                 else status = "Settled at clearing";
                 return (

@@ -91,7 +91,7 @@ Ended ──finalize() / auto──▶ Finalized ──now > finalizedAt+30d, sw
 - **Bid form**: an ETH amount box, a max-price box (with a "buy at any price" shortcut that sets it to P0), and a Bid button. Shows a live preview of the snapped step price and whether the bid is live or standing.
 - **Price line chart**: the full stepped schedule P0 → R with a "now" marker; a demand overlay line (`D(k)·1e18/S`, the price at which current demand buys all supply); the standing-order ladder (ETH waiting at each future step); and the clearing point highlighted after finalize.
 - **Status panel**: state, current price, countdown to the next step and to the end, ETH committed, % of supply covered at the current price.
-- **My bids**: each bid with its status (live / standing / cancelled / claimed), a Cancel button where allowed, an estimated tokens and refund, and a Claim button after the end. Shows the claim deadline.
+- **My bids**: each bid with its status (live / standing / cancelled / claimed), a Cancel button where allowed, an estimated tokens and refund, and a Claim button after the end. An uncancelled, unclaimed bid remains live while the auction is active once `effectiveStep ≤ currentStep`; only a future effective step is standing. Shows the claim deadline. For finalized auctions, Claim is available through the deadline using the chain snapshot timestamp, not the browser clock; after expiry it is hidden and the UI explains that unclaimed tokens and ETH may be swept. Ended, unfinalized auctions may still offer Claim to auto-finalize and start the claim window. Swept auctions never offer Claim.
 - **Owner panel** (owner only): Start, Withdraw proceeds, Sweep (enabled after the deadline). A Finalize button is visible to everyone once the auction has ended.
 - **Public bid feed**: live list from events (bidder, ETH, max price, placed/effective step, cancelled).
 
@@ -167,7 +167,7 @@ Example params where useful: `S = 1000e18`, `P0 = 1 ETH`, `R = 0.1 ETH`, `Δ = 3
 48. Given a wallet on the wrong chain, then the UI shows a switch-network prompt and disables actions.
 49. Given Active, then the chart shows all N steps, a "now" marker, a demand line and a standing-order ladder, refreshed on new events or every step.
 50. Given a max price entered below the current price, then the form labels the bid "standing order at step j, price X".
-51. Given Finalized, then the chart marks the clearing point, My bids shows the exact claimable tokens and refund, and the deadline is displayed.
+51. Given Finalized, then the chart marks the clearing point, My bids shows the exact claimable tokens and refund, and the deadline is displayed. With outstanding bids, Claim is available when the chain snapshot timestamp is at or before the deadline; afterward it is hidden and expiry/sweep eligibility is explained.
 52. Given a non-owner wallet, then the owner panel is hidden.
 
 ## 8. Out of scope

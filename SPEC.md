@@ -18,7 +18,7 @@ Notation: `S` = token supply (token-wei, 18 decimals), `P0` = start price, `R` =
 ## 2. Business rules
 **Fixed choices:** Solidity smart contracts on the EVM; ERC-20 token; MetaMask wallet; local dev chain plus Sepolia. Frameworks and libraries are left to implementation (stack-agnostic).
 
-1. **Parameters**: constructor args `tokenName, tokenSymbol, S, P0, R, Δ, minBid`, all immutable. Total duration is fixed at 1200 s and the claim period is fixed at 30 days. The constructor reverts unless `P0 > R > 0`, `S > 0`, `minBid > 0`, `1200 % Δ == 0`, `2 ≤ N ≤ 120`, `S ≤ 1e30` token-wei (1e12 tokens), and `P0 ≤ 1e24` wei (1e6 ETH per token). The bounds keep price × supply × 1e18 inside uint256.
+1. **Parameters**: constructor args `tokenName, tokenSymbol, S, P0, R, Δ, minBid`, all immutable. Total duration is fixed at 1200 s and the claim period is fixed at 30 days. The constructor reverts unless `P0 > R > 0`, `P0 − R ≥ N − 1` wei, `S > 0`, `minBid > 0`, `1200 % Δ == 0`, `2 ≤ N ≤ 120`, `S ≤ 1e30` token-wei (1e12 tokens), and `P0 ≤ 1e24` wei (1e6 ETH per token). The price-spread constraint ensures every integer step price decreases by at least one wei, as required by AC9. The bounds keep price × supply × 1e18 inside uint256.
 2. **Price schedule (linear steps)**: `step(t) = floor((t − T0) / Δ)` for `T0 ≤ t < END`. `price(k) = P0 − floor(k·(P0 − R)/(N − 1))`, so `price(0) = P0` and `price(N−1) = R`, which is live for the final Δ seconds.
 3. **Bid** = `(ethAmount = msg.value, maxPrice)`. Validation: auction Active and not ended; `msg.value ≥ minBid`; `maxPrice ≥ R`.
 4. **Snapping**: `maxStep m` = the smallest k with `price(k) ≤ maxPrice` (the price rounds down to a step price). If `maxPrice ≥ P0` then `m = 0`.
@@ -70,6 +70,8 @@ ETH is never sent in a loop over bidders. Nobody can withdraw another party's ET
 
 **Events**: `AuctionStarted(startTime, endTime)`; `BidPlaced(bidId, bidder, ethAmount, maxPrice, placedStep, effectiveStep)`; `BidCancelled(bidId, bidder, refund)`; `SoldOut(step, price)`; `AuctionFinalized(clearingStep, clearingPrice, tokensSold, tokensBurned, soldOut)`; `Claimed(bidder, tokens, refund)`; `ProceedsWithdrawn(owner, amount)`; `AuctionSwept(tokensBurned, ethToOwner)`.
 
+`ProceedsWithdrawn.owner` identifies the payout recipient captured before the ETH transfer, even if that recipient transfers ownership during its receive callback. Ownership transfers remain permitted.
+
 **Test-only (bonus)**: `VulnerableAuction` has the same claim logic but sends ETH before marking the claim done and has no guard. `ReentrancyAttacker` re-enters `claim` from `receive()`.
 
 ## 5. State machine
@@ -98,7 +100,7 @@ Example params where useful: `S = 1000e18`, `P0 = 1 ETH`, `R = 0.1 ETH`, `Δ = 3
 
 **Deployment and start**
 1. Given valid params, when deployed, then the token supply = S, held entirely by the auction, the owner = deployer, and state = Created.
-2. Given `P0 ≤ R`, or `R = 0`, or `S = 0`, or `minBid = 0`, or `1200 % Δ ≠ 0`, or `N < 2`, or `N > 120`, or `S > 1e30`, or `P0 > 1e24`, when deployed, then it reverts.
+2. Given `P0 ≤ R`, or `R = 0`, or `P0 − R < N − 1` wei, or `S = 0`, or `minBid = 0`, or `1200 % Δ ≠ 0`, or `N < 2`, or `N > 120`, or `S > 1e30`, or `P0 > 1e24`, when deployed, then it reverts.
 3. Given Created, when a non-owner calls `startAuction`, then it reverts. When the owner calls it, then `T0 = block.timestamp`, `END = T0+1200`, state = Active, and `AuctionStarted` is emitted.
 4. Given Active, when `startAuction` is called again, then it reverts.
 5. Given Created, when `bid` is called, then it reverts.
@@ -152,7 +154,7 @@ Example params where useful: `S = 1000e18`, `P0 = 1 ETH`, `R = 0.1 ETH`, `Δ = 3
 41. Given Created or Active (not ended), when `claim` is called, then it reverts.
 
 **Owner payouts**
-42. Given ended, when the owner calls `withdrawProceeds`, then it auto-finalizes and sends exactly `proceeds`. A second call reverts. A non-owner reverts.
+42. Given ended, when the owner calls `withdrawProceeds`, then it auto-finalizes and sends exactly `proceeds`. `ProceedsWithdrawn` identifies the actual payout recipient and amount, including when ownership transfers during the payout callback. A second call reverts. A non-owner reverts.
 43. Given Finalized, when the owner calls `sweep` at `now = finalizedAt + 30 days`, then it reverts. At `+1 s`, all remaining tokens are burned, the whole ETH balance goes to the owner, and state = Swept. A second sweep reverts. A non-owner reverts.
 44. Given an owner who never withdrew proceeds, when sweeping, then the proceeds are included in the ETH sent.
 45. After all claims and the withdrawal, the contract ETH balance is ≥ 0 and every claim succeeds (solvency), with any remainder ≤ 1 wei per bid.

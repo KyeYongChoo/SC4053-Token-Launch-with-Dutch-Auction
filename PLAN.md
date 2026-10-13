@@ -37,6 +37,8 @@ Each risk names the test that covers it. A risk with no test is marked **gap** a
 | R13 | Loops over steps and bids make finalize or claim too expensive | Settlement blocked at worst case | None yet. Gas bound test tracked in #21 | **Gap** (#21) |
 | R14 | Owner shill-bids to distort the price | Unfair price discovery | None. Accepted risk: out of scope in SPEC.md section 8 | Accepted |
 | R15 | Token dust remains in the auction after claims | Minor leftover balance | `AC28: rounding never overpays...` (token dust at most 3 token-wei), `AC45 (solvency)...` | Covered |
+| C02 | Constructor accepts a price spread too small for strictly decreasing integer prices | Schedule violates AC9 | `test/AuditC02C03.test.js`: four AC2 rejection cases and six AC9 boundary schedules (2, 20 and 120 steps) | Fixed; regressions verified locally |
+| C03 | Ownership changes during proceeds payout and the event names the new owner instead of the recipient | Incorrect event-based payout attribution | `test/AuditC02C03.test.js`: AC42 callback transfers with explicit/automatic finalization, ordinary payout, transfer-before-payout and zero proceeds | Fixed; regressions verified locally |
 
 ## Verification
 
@@ -44,3 +46,9 @@ Each risk names the test that covers it. A risk with no test is marked **gap** a
 - `npm run frontend:test`: 17 front-end tests (M4): the quote and preview maths, and the App render checks for F1, F2 and F5.
 - `npm run frontend:build`: front-end build.
 - CI runs both on every push and pull request (`.github/workflows/ci.yml`).
+
+### C02/C03 independent verification (2026-10-13)
+
+On `fix/audit-c02-c03`, based on `617c02ca9a9d8dff1498ddcd1afa62bbbec95ff3`, the original contract suite passed 57 tests. The 15 new C02/C03 regressions then produced 9 passes and 6 expected failures against unchanged contract code (four accepted invalid price spreads and two incorrect payout-event recipients). After the scoped fixes, all 15 regressions and the full 72-test contract suite passed. The evidence runner executes the same Hardhat `test` command as `npm test`; exact commands, input hashes, exit codes and output are retained locally under `evidence/audit-c02-c03/2026-10-13/` and are excluded from the commit.
+
+These are actual local Windows/Node 22.20.0 results, not hypothetical results from the supplied audit report or a new CI run on Node 20. Frontend tests/builds, gas measurements and Slither were not run for this change.

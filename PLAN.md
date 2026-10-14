@@ -56,7 +56,7 @@ Each risk names the test or CI check that covers it. A risk with no test is mark
 - `npm run frontend:build`: front-end build.
 - CI runs both on every push and pull request (`.github/workflows/ci.yml`).
 
-Current integrated local run (2026-10-14): 90 contract tests and 63 frontend tests pass; build and configured Slither gate pass. Upstream 75/28 counts above describe the follow-ups before adding our audit regressions. Raw integration evidence is local under `evidence/integration/2026-10-14/` and excluded from the commit.
+Current local verification (2026-10-14), including D01: 98 contract tests and 63 frontend tests pass; build and configured Slither gate pass with zero unreviewed findings (35 reviewed findings remain). The earlier integrated run had 90 contract tests; eight D01 regressions bring the total to 98. Upstream 75/28 counts above describe the follow-ups before adding our audit regressions. Raw integration and D01 evidence is local under `evidence/integration/2026-10-14/` and `evidence/audit-d01/2026-10-14/`, excluded from the commit.
 
 ## Slither static analysis (Issue #28)
 

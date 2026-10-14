@@ -1,0 +1,4 @@
+{
+  "filter_paths": "contracts/test/",
+  "triage_database": "slither.db.json"
+}

@@ -10,7 +10,7 @@ function fixture() {
     supply: 10n ** 18n, currentStep: 1n, isEnded: false, soldOut: false, soldOutStep: 0n,
     owner: ACCOUNT, finalizedAt: 0n, proceedsWithdrawn: false, reservePrice: 1n, minBid: 1n,
     clearing: { step: 0n, price: 0n, tokensSold: 0n, proceeds: 0n, earlyNum: 0n, earlyDen: 1n, joinNum: 0n, joinDen: 1n },
-    bidsOf: IDS, claimDeadline: 0n };
+    bidsOf: IDS, claimDeadline: 0n, MAX_BIDS_PER_ADDRESS: 100n };
   const c = Object.fromEntries(Object.entries(values).map(([name, value]) => [name, vi.fn(async () => value)]));
   c.priceAt = vi.fn(async (k) => 2n - BigInt(k));
   c.demandAt = vi.fn(async () => 0n);
@@ -26,7 +26,8 @@ afterEach(() => vi.restoreAllMocks());
 describe("U04: one captured block per snapshot", () => {
   it("pins every scalar read, step bucket and bidder lookup to the captured block", async () => {
     const { c, values } = fixture();
-    await loadSnapshot(c, ACCOUNT);
+    const snap = await loadSnapshot(c, ACCOUNT);
+    expect(snap.maxBidsPerAddress).toBe(100);
     expect(readProvider.getBlock).toHaveBeenCalledTimes(1);
     expect(readProvider.getBlock).toHaveBeenCalledWith("latest");
     for (const name of Object.keys(values)) {

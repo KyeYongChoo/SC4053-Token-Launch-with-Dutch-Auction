@@ -192,6 +192,21 @@ describe("DutchAuction", function () {
       await auction.connect(alice).bid(RESERVE, { value: MIN_BID });
       expect(await auction.bidsOf(alice.address)).to.deep.equal([0n, 1n]);
     });
+
+    it("AC53: an address may place 100 bids; the 101st reverts, and cancelling does not free a slot", async function () {
+      const { auction, alice, bob } = await loadFixture(startedFixture);
+      expect(await auction.MAX_BIDS_PER_ADDRESS()).to.equal(100n);
+      // A standing order at reserve, cancelled straight away, still counts toward the cap.
+      await auction.connect(alice).bid(RESERVE, { value: MIN_BID });
+      await auction.connect(alice).cancelBid(0);
+      for (let i = 1; i < 99; i++) await auction.connect(alice).bid(START_PRICE, { value: MIN_BID });
+      expect((await auction.bidsOf(alice.address)).length).to.equal(99);
+
+      await expect(auction.connect(alice).bid(START_PRICE, { value: MIN_BID })).to.not.be.reverted; // 100th
+      await expect(auction.connect(alice).bid(START_PRICE, { value: MIN_BID })).to.be.revertedWith("bid limit");
+      // The cap is per address.
+      await expect(auction.connect(bob).bid(START_PRICE, { value: MIN_BID })).to.not.be.reverted;
+    });
   });
 
   // ───────────── Sell-out (AC 18–22) ─────────────

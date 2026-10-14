@@ -65,10 +65,12 @@ The deploy script writes the chain ID and deploy block into `frontend/src/deploy
 
 | Suite | Count | What it covers |
 |---|---|---|
-| Contract tests (`npm test`) | 57 | Acceptance criteria AC1–AC47, review regressions, reentrancy, mixed-role attacker |
-| Front-end tests (`npm run frontend:test`) | 17 | Quote and preview maths, render checks for the placeholder deployment, Finalize, RPC chain banner |
+| Contract tests (`npm test`) | 90 | Acceptance criteria AC1–AC47 and AC53–AC54 (bid cap), C02/C03 audit regressions, reentrancy, mixed-role attacker, gas bounds at 120 steps, and the front-end quote and preview maths checked against the contract (AC50/AC51) |
+| Front-end tests (`npm run frontend:test`) | 63 | Quote and preview maths, AC48 wrong-network wallet, bid-cap message, U01–U04 status/deadline/network/snapshot regressions, exact bid IDs and stale-refresh protection |
 
-GitHub Actions runs the contract tests and the front-end tests and build on every push and pull request (`.github/workflows/ci.yml`).
+These counts were independently executed locally on 14 October 2026 after integrating the audit feature branch with main; they are not a new CI run. The frontend build and configured Slither gate also passed.
+
+GitHub Actions runs the contract tests, the front-end tests and build, and Slither static analysis on every push and pull request (`.github/workflows/ci.yml`). Slither fails on any finding not reviewed in `slither.db.json`; PLAN.md explains each reviewed finding and how to run it locally.
 
 The reentrancy demonstration is bonus work. `VulnerableAuction` is a simplified refund contract that shows the bug. `ReentrancyAttacker` shows that the real auction rejects re-entry from each ETH-sending function.
 
@@ -80,7 +82,9 @@ The reentrancy demonstration is bonus work. `VulnerableAuction` is a simplified 
 
 ## Status and known gaps
 
-- Milestones M1–M4 are merged into `main`. Open follow-ups are tracked as issues: #15 (a live check of front-end quotes against the chain), #21 (a gas bound test for finalize and claim with 120 steps), and #22 (an automated wrong-network test).
+- Milestones M1–M4 and the follow-ups are merged into `main`, with no open issues at inspection. The follow-ups were #15 (front-end maths checked against the chain, #33), #21 (gas bounds at 120 steps, #31) and #22 (wrong-network test, #32). #21 led to a SPEC amendment (#30): each address may place at most 100 bids, bounding auction claim work; measured 120-step auto-finalizing claims fit the 4.6-million-gas local test budget.
+- C02/C03 and U01–U04 audit fixes remain on `fix/audit-c02-c03`, awaiting integration review and a PR. D01 remains open: SPEC AC45's general one-wei-per-bid residual ETH bound is incorrect despite its existing example test passing.
+- The rendering parts of AC49–AC52 (chart, deadline display, owner panel visibility) are checked by hand.
 - The contracts have not been audited. Do not deploy them to mainnet.
 - Shill bidding by the owner is accepted, as SPEC.md section 8 puts anti-shill measures out of scope.
 

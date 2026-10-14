@@ -368,7 +368,7 @@ function PriceChart({ snap }) {
   );
 }
 
-function BidForm({ snap, disabled, onBid }) {
+export function BidForm({ snap, disabled, onBid }) {
   const [amount, setAmount] = useState("1");
   const [maxPrice, setMaxPrice] = useState(() => formatEther(snap.prices[0]));
 
@@ -387,7 +387,13 @@ function BidForm({ snap, disabled, onBid }) {
     amountOk = false;
   }
 
-  const err = parseError || preview?.error || (!amountOk && "Amount is below the minimum bid.") || "";
+  const atBidLimit = snap.myBids.length >= snap.maxBidsPerAddress;
+  const err =
+    (atBidLimit && `This address has placed the maximum of ${snap.maxBidsPerAddress} bids. Cancelled bids count too.`) ||
+    parseError ||
+    preview?.error ||
+    (!amountOk && "Amount is below the minimum bid.") ||
+    "";
   const canSubmit = !disabled && !err;
 
   return (

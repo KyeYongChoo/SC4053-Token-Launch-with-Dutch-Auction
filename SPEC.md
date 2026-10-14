@@ -18,9 +18,9 @@ Notation: `S` = token supply (token-wei, 18 decimals), `P0` = start price, `R` =
 ## 2. Business rules
 **Fixed choices:** Solidity smart contracts on the EVM; ERC-20 token; MetaMask wallet; local dev chain plus Sepolia. Frameworks and libraries are left to implementation (stack-agnostic).
 
-1. **Parameters**: constructor args `tokenName, tokenSymbol, S, P0, R, Δ, minBid`, all immutable. Total duration is fixed at 1200 s and the claim period is fixed at 30 days. The constructor reverts unless `P0 > R > 0`, `P0 − R ≥ N − 1` wei, `S > 0`, `minBid > 0`, `1200 % Δ == 0`, `2 ≤ N ≤ 120`, `S ≤ 1e30` token-wei (1e12 tokens), and `P0 ≤ 1e24` wei (1e6 ETH per token). The price-spread constraint ensures every integer step price decreases by at least one wei, as required by AC9. The bounds keep price × supply × 1e18 inside uint256.
+1. **Parameters**: constructor args `tokenName, tokenSymbol, S, P0, R, Δ, minBid`, all immutable. Total duration is fixed at 1200 s, the claim period is fixed at 30 days, and each address may place at most `MAX_BIDS_PER_ADDRESS = 100` bids (rule 13). The constructor reverts unless `P0 > R > 0`, `P0 − R ≥ N − 1` wei, `S > 0`, `minBid > 0`, `1200 % Δ == 0`, `2 ≤ N ≤ 120`, `S ≤ 1e30` token-wei (1e12 tokens), and `P0 ≤ 1e24` wei (1e6 ETH per token). The price-spread constraint ensures every integer step price decreases by at least one wei, as required by AC9. The bounds keep price × supply × 1e18 inside uint256.
 2. **Price schedule (linear steps)**: `step(t) = floor((t − T0) / Δ)` for `T0 ≤ t < END`. `price(k) = P0 − floor(k·(P0 − R)/(N − 1))`, so `price(0) = P0` and `price(N−1) = R`, which is live for the final Δ seconds.
-3. **Bid** = `(ethAmount = msg.value, maxPrice)`. Validation: auction Active and not ended; `msg.value ≥ minBid`; `maxPrice ≥ R`.
+3. **Bid** = `(ethAmount = msg.value, maxPrice)`. Validation: auction Active and not ended; `msg.value ≥ minBid`; `maxPrice ≥ R`; the caller has placed fewer than `MAX_BIDS_PER_ADDRESS` bids.
 4. **Snapping**: `maxStep m` = the smallest k with `price(k) ≤ maxPrice` (the price rounds down to a step price). If `maxPrice ≥ P0` then `m = 0`.
 5. **Effective step** `e = max(placedStep, m)`. If `e == placedStep` the bid is **live** and counts immediately. If `e > placedStep` it is a **standing order** and counts from the start of step `e`.
 6. **Demand** `D(k)` = sum of `ethAmount` over non-cancelled bids with `e ≤ k`.
@@ -33,7 +33,7 @@ Notation: `S` = token supply (token-wei, 18 decimals), `P0` = start price, `R` =
     - Sold out with `A < Need`: bids with `e < c` get f = 1. Bids with `e == c` get pro-rata `f = (Need − A) / J`.
 11. **Per-bid settlement**: `tokens = floor(eth·f·1e18 / price(c))`. The ETH charged is `ceil(eth·f)`, so the bidder overpays by at most 1 wei. `refund = eth − charged`. Cancelled bids are excluded because they were already refunded.
 12. **Cancel**: only the bidder who placed it, only while the auction has not ended, and only while `currentStep < e`. Live bids can never be cancelled. Cancelling refunds the full ETH immediately.
-13. **Multiple bids**: an address may hold any number of bids, each with a unique incremental `bidId`.
+13. **Multiple bids**: an address may place up to `MAX_BIDS_PER_ADDRESS = 100` bids, each with a unique incremental `bidId`. Every bid placed counts toward the cap, including cancelled bids, because `claim` still walks them. The cap bounds the gas of `claim`, which settles all of the caller's bids in one transaction: without it, an address with more bids than fit under the EIP-7825 per-transaction gas cap (2^24) could never claim, and its tokens and refunds would be swept after the deadline. One address is limited, not one person; a bidder needing more uses another address.
 14. **Finalize**: callable by anyone once the auction has ended, and only once. It is also run automatically by `claim` and `withdrawProceeds` if nobody has called it yet. It records `c`, `price(c)`, the tier fractions, `tokensSold = min(S, floor(D_filled·1e18/price(c)))`, `proceeds`, and `finalizedAt`. It burns `S − tokensSold`.
 15. **Claim window**: `deadline = finalizedAt + 30 days`. `claim` is allowed while `now ≤ deadline`. `sweep` is allowed when `now > deadline`.
 16. **Rounding dust**: token amounts round down and ETH charges round up. The contract can therefore always pay every claim and the owner's proceeds. Leftover token dust is burned at `sweep`, and leftover wei goes to the owner at `sweep`.
@@ -60,13 +60,13 @@ ETH is never sent in a loop over bidders. Nobody can withdraw another party's ET
 |---|---|---|
 | `constructor(string name, string symbol, uint256 supply, uint256 startPrice, uint256 reservePrice, uint256 stepDuration, uint256 minBid)` | deployer → owner | Deploys `LaunchToken` and validates the parameters (rule 1). |
 | `startAuction()` | owner | Only in Created. Sets `T0 = block.timestamp`. |
-| `bid(uint256 maxPrice) payable returns (uint256 bidId)` | anyone | Rules 3–7. If the bid causes a sell-out, the auction ends in the same tx. |
+| `bid(uint256 maxPrice) payable returns (uint256 bidId)` | anyone | Rules 3–7 and 13. Reverts once the caller has placed `MAX_BIDS_PER_ADDRESS` bids. If the bid causes a sell-out, the auction ends in the same tx. |
 | `cancelBid(uint256 bidId)` | bid owner | Rule 12. |
 | `finalize()` | anyone | Rule 14. |
 | `claim()` | anyone with unclaimed bids | Settles all of the caller's uncancelled, unclaimed bids. Reverts if there is nothing to claim or if past the deadline. |
 | `withdrawProceeds()` | owner | Once, after finalize (auto-finalizes). |
 | `sweep()` | owner | Once, when `now > deadline`. |
-| Views | anyone | `state()`, `token()`, `startTime()`, `endTime()`, `stepCount()`, `currentStep()`, `currentPrice()`, `priceAt(k)`, `stepJoinAmount(k)` (ETH joining at step k), `demandAt(k)`, `isEnded()`, `getBid(id)`, `bidsOf(addr)`, `previewClaim(addr) → (tokens, refund)` (exact after finalize, estimated before), `clearingStep()`, `clearingPrice()`, `tokensSold()`, `proceeds()`, `claimDeadline()`. |
+| Views | anyone | `state()`, `token()`, `startTime()`, `endTime()`, `stepCount()`, `currentStep()`, `currentPrice()`, `priceAt(k)`, `stepJoinAmount(k)` (ETH joining at step k), `demandAt(k)`, `isEnded()`, `getBid(id)`, `bidsOf(addr)`, `previewClaim(addr) → (tokens, refund)` (exact after finalize, estimated before), `MAX_BIDS_PER_ADDRESS()`, `clearingStep()`, `clearingPrice()`, `tokensSold()`, `proceeds()`, `claimDeadline()`. |
 
 **Events**: `AuctionStarted(startTime, endTime)`; `BidPlaced(bidId, bidder, ethAmount, maxPrice, placedStep, effectiveStep)`; `BidCancelled(bidId, bidder, refund)`; `SoldOut(step, price)`; `AuctionFinalized(clearingStep, clearingPrice, tokensSold, tokensBurned, soldOut)`; `Claimed(bidder, tokens, refund)`; `ProceedsWithdrawn(owner, amount)`; `AuctionSwept(tokensBurned, ethToOwner)`.
 
@@ -170,6 +170,10 @@ Example params where useful: `S = 1000e18`, `P0 = 1 ETH`, `R = 0.1 ETH`, `Δ = 3
 50. Given a max price entered below the current price, then the form labels the bid "standing order at step j, price X".
 51. Given Finalized, then the chart marks the clearing point, My bids shows the exact claimable tokens and refund, and the deadline is displayed. With outstanding bids, Claim is available when the chain snapshot timestamp is at or before the deadline; afterward it is hidden and expiry/sweep eligibility is explained.
 52. Given a non-owner wallet, then the owner panel is hidden.
+
+**Bid cap**
+53. Given an address that has placed 99 bids, when it bids again, then it is accepted. When it then places a 101st bid, then it reverts. Cancelling a bid does not free a slot.
+54. Given `N = 120` and an address holding `MAX_BIDS_PER_ADDRESS` bids, each joining at a different step, when it claims after the end (auto-finalizing), then the claim succeeds and uses less than 2^24 gas.
 
 ## 8. Out of scope
 KYC/whitelists; multiple or concurrent auctions per contract (factory); upgradeability/proxies; pause/emergency cancel; owner-bid restriction or anti-shill measures; vesting or lockups on claimed tokens; token trading or liquidity provision; mainnet deployment; continuous (per-second) or exponential price decay; ERC-20 tokens other than ETH as payment; gas sponsorship/meta-transactions; a backend server or indexer (the front end reads chain events directly); mobile-specific UI.

@@ -1,12 +1,12 @@
 import { Contract, JsonRpcProvider, formatEther } from "ethers";
 import deployment from "./deployment.json";
 
-// Data access and maths for the auction. Mirrors SPEC.md §2 so the UI can show per-bid
-// estimates without an extra round trip. The contract remains the source of truth.
+// Data access for the auction. The quote and preview maths (SPEC.md §2) live in maths.js, which
+// the contract tests also load, and are re-exported here. The contract remains the source of truth.
+export { WAD, previewBid, quoteBid } from "./maths.js";
 
 export const DEPLOYMENT = deployment;
 export const RPC_URL = import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545";
-export const WAD = 10n ** 18n;
 export const STATE_NAMES = ["Created", "Active", "Finalized", "Swept"];
 
 export const readProvider = new JsonRpcProvider(RPC_URL);
@@ -125,36 +125,6 @@ export async function loadSnapshot(c, account) {
     myBids,
     feed,
   };
-}
-
-/** Per-bid tokens and refund under the clearing result (SPEC §2.11). Null before finalization. */
-export function quoteBid(bid, cl) {
-  if (cl.price === 0n) return null;
-  if (bid.cancelled || bid.claimed) return { tokens: 0n, refund: 0n };
-  let num;
-  let den;
-  if (bid.effectiveStep < cl.step) {
-    num = cl.earlyNum;
-    den = cl.earlyDen;
-  } else if (bid.effectiveStep === cl.step) {
-    num = cl.joinNum;
-    den = cl.joinDen;
-  } else {
-    return { tokens: 0n, refund: bid.ethAmount };
-  }
-  const eth = bid.ethAmount;
-  const charged = (eth * num + den - 1n) / den;
-  const tokens = (eth * num * WAD) / (den * cl.price);
-  return { tokens, refund: eth - charged };
-}
-
-/** Which step a bid placed now at `maxPrice` would take, given the current step. */
-export function previewBid(snap, maxPrice) {
-  if (maxPrice < snap.reservePrice) return { error: "Max price is below the reserve price." };
-  for (let k = snap.cur; k < snap.stepCount; k++) {
-    if (snap.prices[k] <= maxPrice) return { step: k, live: k === snap.cur, price: snap.prices[k] };
-  }
-  return { error: "No step reaches this max price." };
 }
 
 export function fmtEth(wei, digits = 4) {

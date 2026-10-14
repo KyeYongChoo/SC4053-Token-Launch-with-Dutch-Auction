@@ -52,6 +52,7 @@ const ENDED_SNAPSHOT = {
   proceedsWithdrawn: false,
   reservePrice: WAD,
   minBidWei: 10n ** 16n,
+  maxBidsPerAddress: 100,
   clearing: { step: 0, price: 0n, tokensSold: 0n, proceeds: 0n, earlyNum: 0n, earlyDen: 0n, joinNum: 0n, joinDen: 0n },
   prices: Array.from({ length: 20 }, (_, k) => (29n * WAD) / 10n - (BigInt(k) * WAD) / 10n),
   demand: Array(20).fill(0n),

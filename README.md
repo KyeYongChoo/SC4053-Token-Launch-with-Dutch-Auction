@@ -65,10 +65,10 @@ The deploy script writes the chain ID and deploy block into `frontend/src/deploy
 
 | Suite | Count | What it covers |
 |---|---|---|
-| Contract tests (`npm test`) | 57 | Acceptance criteria AC1–AC47, review regressions, reentrancy, mixed-role attacker |
-| Front-end tests (`npm run frontend:test`) | 17 | Quote and preview maths, render checks for the placeholder deployment, Finalize, RPC chain banner |
+| Contract tests (`npm test`) | 75 | Acceptance criteria AC1–AC47 and AC53–AC54 (bid cap), review regressions, reentrancy, mixed-role attacker, gas bounds at 120 steps, and the front-end quote and preview maths checked against the contract (AC50/AC51) |
+| Front-end tests (`npm run frontend:test`) | 28 | Quote and preview maths, AC48 wrong-network wallet (prompt, every action button, send-time chain check), bid-cap message in the bid form, render checks for the placeholder deployment, Finalize, RPC chain banner |
 
-GitHub Actions runs the contract tests and the front-end tests and build on every push and pull request (`.github/workflows/ci.yml`).
+GitHub Actions runs the contract tests, the front-end tests and build, and Slither static analysis on every push and pull request (`.github/workflows/ci.yml`). Slither fails on any finding not reviewed in `slither.db.json`; PLAN.md explains each reviewed finding and how to run it locally.
 
 The reentrancy demonstration is bonus work. `VulnerableAuction` is a simplified refund contract that shows the bug. `ReentrancyAttacker` shows that the real auction rejects re-entry from each ETH-sending function.
 
@@ -80,7 +80,8 @@ The reentrancy demonstration is bonus work. `VulnerableAuction` is a simplified 
 
 ## Status and known gaps
 
-- Milestones M1–M4 are merged into `main`. Open follow-ups are tracked as issues: #15 (a live check of front-end quotes against the chain), #21 (a gas bound test for finalize and claim with 120 steps), and #22 (an automated wrong-network test).
+- Milestones M1–M4 and the follow-ups are merged into `main`, with no open issues. The follow-ups were #15 (front-end maths checked against the chain, #33), #21 (gas bounds at 120 steps, #31) and #22 (wrong-network test, #32). #21 led to a SPEC amendment (#30): each address may place at most 100 bids, so `claim` always fits in one transaction.
+- The rendering parts of AC49–AC52 (chart, deadline display, owner panel visibility) are checked by hand.
 - The contracts have not been audited. Do not deploy them to mainnet.
 - Shill bidding by the owner is accepted, as SPEC.md section 8 puts anti-shill measures out of scope.
 

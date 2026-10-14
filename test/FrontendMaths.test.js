@@ -129,7 +129,18 @@ async function playAuction(seed) {
 }
 
 describe("Front-end maths against the chain (R11)", function () {
-  const seen = { soldOut: 0, undersold: 0, early: 0, join: 0, later: 0, cancelled: 0, previews: 0 };
+  const seen = {
+    seedsDone: 0,
+    soldOut: 0,
+    earlyCoversSale: 0, // sold out with A >= Need: joiners get nothing, earlier bids pro-rata
+    joinersProRata: 0, // sold out with A < Need: earlier bids in full, joiners pro-rata
+    undersold: 0,
+    early: 0,
+    join: 0,
+    later: 0,
+    cancelled: 0,
+    previews: 0,
+  };
 
   before(async function () {
     // maths.js is an ES module (frontend/package.json sets "type": "module").
@@ -141,8 +152,12 @@ describe("Front-end maths against the chain (R11)", function () {
       const { auction, bidders, previews } = await playAuction(seed);
       seen.previews += previews;
       const cl = await appClearing(auction);
-      if (await auction.soldOut()) seen.soldOut++;
-      else seen.undersold++;
+      if (await auction.soldOut()) {
+        seen.soldOut++;
+        // The two sold-out tiers of SPEC §2.10 (_computeClearing).
+        if (cl.joinNum === 0n) seen.earlyCoversSale++;
+        else seen.joinersProRata++;
+      } else seen.undersold++;
 
       for (const who of bidders) {
         const ids = await auction.bidsOf(who.address);
@@ -169,12 +184,18 @@ describe("Front-end maths against the chain (R11)", function () {
         if (!claimable) continue;
         await expect(auction.connect(who).claim()).to.emit(auction, "Claimed").withArgs(who.address, tokens, refund);
       }
+      seen.seedsDone++;
     });
   }
 
   it("R11: the seeds reach every branch of quoteBid and previewBid", function () {
     // Guards the test itself: if the random auctions stop covering a branch, change the seeds.
+    // It only means something after every seed has run to the end, so it skips otherwise (run
+    // alone with --grep, or after a seed failed, which is already reported).
+    if (seen.seedsDone !== SEEDS.length) this.skip();
     expect(seen.soldOut, "sold-out auctions").to.be.greaterThan(0);
+    expect(seen.earlyCoversSale, "sold out with earlier bids covering the sale").to.be.greaterThan(0);
+    expect(seen.joinersProRata, "sold out with joiners filled pro-rata").to.be.greaterThan(0);
     expect(seen.undersold, "undersold auctions").to.be.greaterThan(0);
     expect(seen.early, "bids before the clearing step").to.be.greaterThan(0);
     expect(seen.join, "bids joining at the clearing step").to.be.greaterThan(0);

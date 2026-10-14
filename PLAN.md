@@ -10,10 +10,11 @@ The approved specification is [SPEC.md](SPEC.md). This file splits it into miles
 | M2: Process and guardrails | This file, `CLAUDE.md`, Stop hook | #16-#17 | this PR (stacked on #18) |
 | M3: Reentrancy demonstration | Test-only vulnerable contract, guard tests, AC46-AC47 | #10 | #19 (stacked on #18) |
 | M4: Deploy script and web app | `scripts/deploy.js`, bid UI, price chart, owner panel, front-end CI job | #11-#14 (follow-up #15) | #20 (stacked on #19) |
+| Follow-ups | Slither in CI; front-end maths against the chain; gas bounds and the 100-bid cap (SPEC §2.13, AC53-AC54); wrong-network tests (AC48) | #28, #15, #21, #22 | #29, #33, #30 (SPEC) and #31, #32 |
 
 Merge order: M1 (#18) first. M2 and M3 both stack directly on M1 and can merge in either order. M4 (#20) stacks on M3, so merge it after #19. Retarget each PR to `main` as its base merges. Issues close when a pull request lands on `main`.
 
-Follow-up issues not yet in a milestone PR: #15 (automated tests for front-end maths), #21 (gas bound test), #22 (wrong-network test).
+All follow-up issues are closed: #15 by #33, #21 by #31 (after the SPEC amendment #30), and #22 by #32.
 
 ## Risk register
 
@@ -42,8 +43,8 @@ Each risk names the test or CI check that covers it. A risk with no test is mark
 
 ## Verification
 
-- `npm ci`, `npm test`: M1 runs 49 tests (44 in `DutchAuction.test.js` covering AC1-AC45, and 5 review regression tests). With M3 merged, the contract suite runs 57 (adds 4 reentrancy, 2 review and 2 mixed-role tests).
-- `npm run frontend:test`: 17 front-end tests (M4): the quote and preview maths, and the App render checks for F1, F2 and F5.
+- `npm ci`, `npm test`: M1 runs 49 tests (44 in `DutchAuction.test.js` covering AC1-AC45, and 5 review regression tests). With M3 merged, the contract suite runs 57 (adds 4 reentrancy, 2 review and 2 mixed-role tests). After the follow-ups it runs 75: AC53 (1), `GasBounds.test.js` (8, including AC54) and `FrontendMaths.test.js` (9).
+- `npm run frontend:test`: 17 front-end tests (M4): the quote and preview maths, and the App render checks for F1, F2 and F5. After the follow-ups it runs 28: AC48 in `App.test.jsx` (9) and the bid-cap message in `BidForm.test.jsx` (2).
 - `npm run frontend:build`: front-end build.
 - CI runs both on every push and pull request (`.github/workflows/ci.yml`).
 

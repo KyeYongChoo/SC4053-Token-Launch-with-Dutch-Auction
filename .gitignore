@@ -9,3 +9,6 @@ frontend/dist/
 frontend/.env.local
 .venv-slither/
 .npm-cache/
+/artifacts
+/frontend/node_modules
+/node_modules

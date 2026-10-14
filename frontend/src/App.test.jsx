@@ -171,4 +171,38 @@ describe("AC48: wrong-network wallet", function () {
     expect(await screen.findByText(/Bid failed: Wallet is on chain 1\. Switch to chain 31337 first\./)).toBeTruthy();
     expect(wallet.calls).not.toContain("eth_sendTransaction");
   });
+
+  // Every other action button depends on canAct too. Each is checked on the wrong chain, and on
+  // the right chain as a control, so a button that drops disabled={!canAct} is caught.
+  const standingBid = { id: 0, bidder: ACCOUNT, ethAmount: WAD, maxPrice: WAD, placedStep: 5, effectiveStep: 19, cancelled: false, claimed: false };
+  const finalizedBid = { ...standingBid, effectiveStep: 0 };
+  const OWNER_LIVE = { ...LIVE_SNAPSHOT, owner: ACCOUNT, myBids: [standingBid] };
+  const OWNER_FINALIZED = {
+    ...ENDED_SNAPSHOT,
+    state: 2,
+    owner: ACCOUNT,
+    finalizedAt: 1300,
+    claimDeadline: 2000, // chainNow is 10_000, so the sweep is open
+    clearing: { step: 19, price: WAD, tokensSold: WAD, proceeds: WAD, earlyNum: 1n, earlyDen: 1n, joinNum: 1n, joinDen: 1n },
+    myBids: [finalizedBid],
+  };
+  const OWNER_CREATED = { ...ENDED_SNAPSHOT, state: 0, cur: 0, ended: false, owner: ACCOUNT };
+  const cases = [
+    ["Cancel", OWNER_LIVE],
+    ["Claim tokens and refunds", OWNER_FINALIZED],
+    ["Withdraw proceeds", OWNER_FINALIZED],
+    ["Sweep after claim deadline", OWNER_FINALIZED],
+    ["Start auction", OWNER_CREATED],
+  ];
+
+  for (const [name, snapshot] of cases) {
+    it(`AC48: "${name}" is disabled on the wrong chain and enabled on the deployment chain`, async () => {
+      await connectWallet(1, snapshot);
+      expect(screen.getByRole("button", { name }).disabled).toBe(true);
+      cleanup();
+
+      await connectWallet(31337, snapshot);
+      expect(screen.getByRole("button", { name }).disabled).toBe(false);
+    });
+  }
 });

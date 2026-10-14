@@ -27,7 +27,7 @@ export async function loadSnapshot(c, account) {
   const fetchedAt = Date.now() / 1000;
 
   const [state, startTime, endTime, stepCount, stepSeconds, supply, cur, ended, soldOut, soldOutStep,
-    owner, finalizedAt, proceedsWithdrawn, reservePrice, minBid, clearing, bidIds, claimDeadline] = await Promise.all([
+    owner, finalizedAt, proceedsWithdrawn, reservePrice, minBid, clearing, bidIds, claimDeadline, maxBidsPerAddress] = await Promise.all([
     c.state(),
     c.startTime(),
     c.endTime(),
@@ -46,6 +46,7 @@ export async function loadSnapshot(c, account) {
     c.clearing(),
     account ? c.bidsOf(account) : Promise.resolve([]),
     c.claimDeadline(),
+    c.MAX_BIDS_PER_ADDRESS(),
   ]);
 
   const N = Number(stepCount);
@@ -109,6 +110,8 @@ export async function loadSnapshot(c, account) {
     proceedsWithdrawn,
     reservePrice,
     minBidWei: minBid,
+    // Every bid counts, cancelled ones included (SPEC §2.13), so compare with myBids.length.
+    maxBidsPerAddress: Number(maxBidsPerAddress),
     clearing: {
       step: Number(clearing.step),
       price: clearing.price,

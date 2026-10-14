@@ -17,6 +17,7 @@ contract DutchAuction is Ownable, ReentrancyGuard {
     uint256 public constant MAX_STEPS = 120; // SPEC §2.1
     uint256 public constant MAX_SUPPLY = 1e30; // SPEC §2.1: 1e12 whole tokens, keeps price * supply * WAD inside uint256
     uint256 public constant MAX_START_PRICE = 1e24; // SPEC §2.1: 1e6 ETH per token
+    uint256 public constant MAX_BIDS_PER_ADDRESS = 100; // SPEC §2.13: bounds the claim() loop
     uint256 private constant WAD = 1e18;
 
     enum State {
@@ -173,6 +174,8 @@ contract DutchAuction is Ownable, ReentrancyGuard {
         require(block.timestamp < endTime, "ended");
         require(msg.value >= minBid, "below minBid");
         require(maxPrice >= reservePrice, "below reserve");
+        // Cancelled bids count too: claim() still walks them (SPEC §2.13).
+        require(_bidIdsOf[msg.sender].length < MAX_BIDS_PER_ADDRESS, "bid limit");
         _advance();
         require(!soldOut, "sold out");
 

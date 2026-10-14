@@ -15,7 +15,7 @@ const MAX_BIDS = 100; // DutchAuction.MAX_BIDS_PER_ADDRESS
 const BUDGET = {
   finalize: 860_000n, // measured 713k
   claim: 4_600_000n, // auto-finalize + 100 bids, measured 3.84M
-  claimPerBid: 37_000n, // measured 31.7k
+  claimPerBid: 37_000n, // average over the whole claim tx, measured 31.7k
   previewClaim: 1_800_000n, // 100 bids, measured 1.50M
 };
 
@@ -43,6 +43,8 @@ async function worstCase(amountAt) {
   await auction.startAuction();
   const t0 = await auction.startTime();
   expect(await auction.stepCount()).to.equal(BigInt(STEP_COUNT));
+  // The worst case is built from MAX_BIDS, so it must track the contract constant.
+  expect(await auction.MAX_BIDS_PER_ADDRESS()).to.equal(BigInt(MAX_BIDS));
 
   // One block for all 120 bids, so every bid is placed at step 0.
   await network.provider.send("evm_setAutomine", [false]);
@@ -101,10 +103,12 @@ describe("Gas bounds at 120 steps (R13)", function () {
         expect(gas).to.be.lte(BUDGET.claim);
       });
 
-      it(`R13: claim after finalize costs at most ${BUDGET.claimPerBid} gas per bid`, async function () {
+      it(`R13: claim after finalize costs at most ${BUDGET.claimPerBid} gas per bid on average`, async function () {
         const { auction, bob, t0 } = await loadFixture(fixture);
         await time.increaseTo(t0 + WINDOW);
         await auction.finalize();
+        // Includes the intrinsic 21k, the token transfer and the refund, so it overstates the
+        // marginal cost per bid: a conservative upper bound.
         const perBid = (await gasOf(auction.connect(bob).claim())) / BigInt(MAX_BIDS);
         expect(perBid).to.be.lte(BUDGET.claimPerBid);
         // The bid cap must stay well inside what one transaction can settle.

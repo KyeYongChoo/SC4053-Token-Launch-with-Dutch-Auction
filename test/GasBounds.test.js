@@ -6,17 +6,17 @@ const { loadFixture, mine, time } = require("@nomicfoundation/hardhat-network-he
 // walks the caller's bids. These tests build the worst case for each loop and fail if the gas
 // used exceeds the budget below. Budgets are the measured cost plus about 20% headroom.
 //
-// The step loops are bounded by MAX_STEPS. The bid loop in claim() is not: it grows with the
-// caller's own bid count, so the per-bid budget caps how many bids one claim can settle in a
-// transaction. Since Fusaka, EIP-7825 caps a transaction at 2^24 gas whatever the block size
-// (Hardhat's 30M block is not the limit on Sepolia or mainnet): 2^24 / 37k is about 450 bids.
-// Only the caller's own bids are walked, so nobody can grow another bidder's claim.
+// The step loops are bounded by MAX_STEPS, and the bid loop in claim() by MAX_BIDS_PER_ADDRESS
+// (SPEC §2.13). Since Fusaka, EIP-7825 caps a transaction at 2^24 gas whatever the block size
+// (Hardhat's 30M block is not the limit on Sepolia or mainnet). Without the bid cap, 2^24 / 37k
+// is about 450 bids, past which an address could never claim (AC54).
 const TX_GAS_CAP = 16_777_216n; // EIP-7825
+const MAX_BIDS = 100; // DutchAuction.MAX_BIDS_PER_ADDRESS
 const BUDGET = {
   finalize: 860_000n, // measured 713k
-  claim: 5_400_000n, // auto-finalize + 120 bids, measured 4.45M
-  claimPerBid: 37_000n, // measured about 31k
-  previewClaim: 2_100_000n, // measured 1.72M
+  claim: 4_600_000n, // auto-finalize + 100 bids, measured 3.84M
+  claimPerBid: 37_000n, // measured 31.7k
+  previewClaim: 1_800_000n, // 100 bids, measured 1.50M
 };
 
 // 10 s steps => N = 120, the most the constructor accepts (SPEC §2.1).
@@ -30,12 +30,13 @@ const MIN_BID = ETH("0.01");
 const WINDOW = 1200n;
 
 /**
- * Started auction where bob holds one standing order joining at every step, all placed in the
- * first block. No call touches the auction afterwards, so finalize must scan all 120 steps.
+ * Started auction with one standing order joining at every step, all placed in the first block.
+ * bob holds the most bids one address may (steps 0-99) and carol the rest (steps 100-119). No
+ * call touches the auction afterwards, so finalize must scan all 120 steps.
  * `amountAt(k)` is the ETH joining at step k.
  */
 async function worstCase(amountAt) {
-  const [owner, bob] = await ethers.getSigners();
+  const [owner, bob, carol] = await ethers.getSigners();
   const auction = await (await ethers.getContractFactory("DutchAuction")).deploy(
     "Launch Token", "LCH", SUPPLY, START_PRICE, RESERVE, STEP, MIN_BID
   );
@@ -47,7 +48,8 @@ async function worstCase(amountAt) {
   await network.provider.send("evm_setAutomine", [false]);
   try {
     for (let k = 0; k < STEP_COUNT; k++) {
-      await auction.connect(bob).bid(await auction.priceAt(k), { value: amountAt(k), gasLimit: 300_000 });
+      const bidder = k < MAX_BIDS ? bob : carol;
+      await auction.connect(bidder).bid(await auction.priceAt(k), { value: amountAt(k), gasLimit: 300_000 });
     }
     await mine();
   } finally {
@@ -55,6 +57,7 @@ async function worstCase(amountAt) {
   }
 
   expect(await auction.bidCount()).to.equal(BigInt(STEP_COUNT));
+  expect((await auction.bidsOf(bob.address)).length).to.equal(MAX_BIDS);
   for (let k = 0; k < STEP_COUNT; k++) {
     expect(await auction.stepJoinAmount(k)).to.equal(amountAt(k));
   }
@@ -87,13 +90,14 @@ describe("Gas bounds at 120 steps (R13)", function () {
         expect(gas).to.be.lte(BUDGET.finalize);
       });
 
-      it(`R13: claim that auto-finalizes and settles 120 bids within ${BUDGET.claim} gas`, async function () {
+      it(`AC54: a claim that auto-finalizes and settles 100 bids uses under 2^24 gas (budget ${BUDGET.claim})`, async function () {
         // claim() runs _ensureFinalized first, so this is the most one transaction can do.
         const { auction, bob, t0 } = await loadFixture(fixture);
         await time.increaseTo(t0 + WINDOW);
         const gas = await gasOf(auction.connect(bob).claim());
         expect(await auction.state()).to.equal(2n); // Finalized
-        expect((await auction.getBid(STEP_COUNT - 1)).claimed).to.equal(true);
+        expect((await auction.getBid(MAX_BIDS - 1)).claimed).to.equal(true);
+        expect(gas).to.be.lt(TX_GAS_CAP);
         expect(gas).to.be.lte(BUDGET.claim);
       });
 
@@ -101,12 +105,13 @@ describe("Gas bounds at 120 steps (R13)", function () {
         const { auction, bob, t0 } = await loadFixture(fixture);
         await time.increaseTo(t0 + WINDOW);
         await auction.finalize();
-        const perBid = (await gasOf(auction.connect(bob).claim())) / BigInt(STEP_COUNT);
-        // At this cost one claim settles about TX_GAS_CAP / claimPerBid bids.
+        const perBid = (await gasOf(auction.connect(bob).claim())) / BigInt(MAX_BIDS);
         expect(perBid).to.be.lte(BUDGET.claimPerBid);
+        // The bid cap must stay well inside what one transaction can settle.
+        expect(BigInt(MAX_BIDS) * BUDGET.claimPerBid + BUDGET.finalize).to.be.lt(TX_GAS_CAP / 2n);
       });
 
-      it(`R13: previewClaim over 120 bids and 120 steps within ${BUDGET.previewClaim} gas`, async function () {
+      it(`R13: previewClaim over 100 bids and 120 steps within ${BUDGET.previewClaim} gas`, async function () {
         // Before finalize, previewClaim projects the clearing, which repeats the step scan.
         const { auction, bob, t0 } = await loadFixture(fixture);
         await time.increaseTo(t0 + WINDOW);

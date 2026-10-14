@@ -8,9 +8,10 @@ const { loadFixture, mine, time } = require("@nomicfoundation/hardhat-network-he
 //
 // The step loops are bounded by MAX_STEPS. The bid loop in claim() is not: it grows with the
 // caller's own bid count, so the per-bid budget caps how many bids one claim can settle in a
-// block (30M / 37k is about 800). Only the caller's own bids are walked, so nobody can grow
-// another bidder's claim.
-const BLOCK_GAS_LIMIT = 30_000_000n;
+// transaction. Since Fusaka, EIP-7825 caps a transaction at 2^24 gas whatever the block size
+// (Hardhat's 30M block is not the limit on Sepolia or mainnet): 2^24 / 37k is about 450 bids.
+// Only the caller's own bids are walked, so nobody can grow another bidder's claim.
+const TX_GAS_CAP = 16_777_216n; // EIP-7825
 const BUDGET = {
   finalize: 860_000n, // measured 713k
   claim: 5_400_000n, // auto-finalize + 120 bids, measured 4.45M
@@ -101,7 +102,7 @@ describe("Gas bounds at 120 steps (R13)", function () {
         await time.increaseTo(t0 + WINDOW);
         await auction.finalize();
         const perBid = (await gasOf(auction.connect(bob).claim())) / BigInt(STEP_COUNT);
-        // At this cost one claim settles about BLOCK_GAS_LIMIT / claimPerBid bids.
+        // At this cost one claim settles about TX_GAS_CAP / claimPerBid bids.
         expect(perBid).to.be.lte(BUDGET.claimPerBid);
       });
 

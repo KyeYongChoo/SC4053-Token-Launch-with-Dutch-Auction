@@ -7,3 +7,6 @@ typechain-types/
 frontend/node_modules/
 frontend/dist/
 frontend/.env.local
+/artifacts
+/frontend/node_modules
+/node_modules

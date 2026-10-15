@@ -37,7 +37,7 @@ export default function App() {
   const [account, setAccount] = useState("");
   const [chainId, setChainId] = useState(null);
   const [rpcChainId, setRpcChainId] = useState(null);
-  const [snap, setSnap] = useState(null);
+  const [rawSnap, setSnap] = useState(null);
   const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
@@ -185,9 +185,11 @@ export default function App() {
     );
   }
 
+  // Once the next block would be at or past END, actions treat the auction as ended (AC55).
+  const snap = rawSnap?.awaitingBlock ? { ...rawSnap, ended: true } : rawSnap;
   const isOwner = Boolean(account) && snap && account.toLowerCase() === snap.owner.toLowerCase();
   // Local clock estimate between polls, so countdowns move every second.
-  const chainNow = snap ? snap.chainNow + (Date.now() / 1000 - snap.fetchedAt) : 0;
+  const chainNow = snap ? (snap.nextBlockTime ?? snap.chainNow) + (Date.now() / 1000 - snap.fetchedAt) : 0;
 
   return (
     <div className="page">
@@ -236,6 +238,9 @@ export default function App() {
             <section className="card">
               <h2>Finalize</h2>
               <p className="muted">The auction has ended. Anyone can finalize it to record the clearing result.</p>
+              {snap.awaitingBlock && (
+                <p className="muted small">No block has been mined since the end yet; the next transaction closes the auction.</p>
+              )}
               <button className="primary" onClick={() => run("Finalize", (c) => c.finalize())} disabled={!canAct}>
                 Finalize
               </button>
@@ -274,6 +279,7 @@ function StatusPanel({ snap, chainNow }) {
 
   let headline = stateName;
   if (snap.state === 1 && snap.soldOut) headline = `Sold out at step ${snap.soldOutStep}`;
+  else if (snap.awaitingBlock) headline = "Ended, waiting for a new block";
   else if (snap.state === 1 && snap.ended) headline = "Ended, not finalized";
   else if (snap.state === 2) headline = "Finalized";
   else if (snap.state === 3) headline = "Swept";

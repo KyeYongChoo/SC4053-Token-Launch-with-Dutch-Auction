@@ -27,6 +27,10 @@ export async function loadSnapshot(c, account) {
   if (!block) throw new Error("Latest block is unavailable.");
   const atBlock = { blockTag: block.number };
   const fetchedAt = Date.now() / 1000;
+  // The pending block carries the timestamp the next block will get. A local chain that mines only
+  // on transactions leaves the latest block behind real time, so countdowns run from this instead.
+  const pending = await readProvider.getBlock("pending").catch(() => null);
+  const nextBlockTime = Math.max(Number(block.timestamp), Number(pending?.timestamp ?? 0));
 
   const [state, startTime, endTime, stepCount, stepSeconds, supply, cur, ended, soldOut, soldOutStep,
     owner, finalizedAt, proceedsWithdrawn, reservePrice, minBid, clearing, bidIds, claimDeadline, maxBidsPerAddress] = await Promise.all([
@@ -96,6 +100,9 @@ export async function loadSnapshot(c, account) {
   return {
     fetchedAt,
     chainNow: Number(block.timestamp),
+    nextBlockTime,
+    // Active at the latest block, but the next block is at or past END (SPEC section 6, AC55).
+    awaitingBlock: Number(state) === 1 && !ended && nextBlockTime >= Number(endTime),
     state: Number(state),
     startTime: Number(startTime),
     endTime: Number(endTime),

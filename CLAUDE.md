@@ -14,7 +14,7 @@ Ethereum token launch: an ERC-20 sold by a 20-minute stepped Dutch auction with 
 
 ## Layout
 - `contracts/`: `LaunchToken.sol`, `DutchAuction.sol`. `contracts/test/` is test-only; never deploy it.
-- `test/`: tests named after acceptance criteria (AC1-AC54). AC48-AC52 are front-end criteria: AC48 is automated in `frontend/src/App.test.jsx`, and the maths behind AC50/AC51 in `test/FrontendMaths.test.js`. The rendering parts of AC49-AC52 are manual checks, tracked in PLAN.md. AC53-AC54 cover the per-address bid cap.
+- `test/`: tests named after acceptance criteria (AC1-AC55). AC48-AC52 are front-end criteria: AC48 is automated in `frontend/src/App.test.jsx`, and the maths behind AC50/AC51 in `test/FrontendMaths.test.js`. The rendering parts of AC49-AC52 are manual checks, tracked in PLAN.md. AC53-AC54 cover the per-address bid cap. AC55 (front end: countdowns and the end from the pending block's timestamp) is in `frontend/src/NextBlockAC55.test.js` and `.test.jsx`.
 - `scripts/deploy.js`: writes `frontend/src/deployment.json`, which is generated. Do not edit it by hand.
 - `frontend/`: React and Vite app.
 

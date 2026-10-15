@@ -28,8 +28,8 @@ describe("U04: one captured block per snapshot", () => {
     const { c, values } = fixture();
     const snap = await loadSnapshot(c, ACCOUNT);
     expect(snap.maxBidsPerAddress).toBe(100);
-    expect(readProvider.getBlock).toHaveBeenCalledTimes(1);
-    expect(readProvider.getBlock).toHaveBeenCalledWith("latest");
+    // The pinned block is the latest one; the pending block only supplies next-block time (AC55).
+    expect(readProvider.getBlock.mock.calls).toEqual([["latest"], ["pending"]]);
     for (const name of Object.keys(values)) {
       expect(c[name]).toHaveBeenCalledTimes(1);
       expect(c[name]).toHaveBeenCalledWith(...(name === "bidsOf" ? [ACCOUNT] : []), { blockTag: BLOCK.number });

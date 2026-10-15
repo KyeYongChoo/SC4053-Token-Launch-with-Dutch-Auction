@@ -177,11 +177,12 @@ export default function App() {
   // Next-block time, advanced by the local clock between polls so countdowns move every second.
   const chainNow = rawSnap ? (rawSnap.nextBlockTime ?? rawSnap.chainNow) + (Date.now() / 1000 - rawSnap.fetchedAt) : 0;
   // What a transaction sent now would see: the displayed step, and the end once the next block
-  // would be at or past END (AC55).
+  // would be at or past END (AC55). Both follow the advancing clock, so END passing between polls counts.
   const step = rawSnap ? displayedStep(rawSnap, chainNow) : 0;
+  const awaitingBlock = Boolean(rawSnap) && rawSnap.state === 1 && !rawSnap.ended && chainNow >= rawSnap.endTime;
   const snap = useMemo(
-    () => rawSnap && { ...rawSnap, cur: step, ended: rawSnap.ended || Boolean(rawSnap.awaitingBlock) },
-    [rawSnap, step]
+    () => rawSnap && { ...rawSnap, cur: step, awaitingBlock, ended: rawSnap.ended || awaitingBlock },
+    [rawSnap, step, awaitingBlock]
   );
 
   if (!DEPLOYMENT.address) {

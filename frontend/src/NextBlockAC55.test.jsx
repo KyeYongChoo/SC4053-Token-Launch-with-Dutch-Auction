@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 // AC55 rendering: once the next block would be at or past END the UI treats the auction as ended.
-// loadSnapshot is mocked; NextBlockAC55.test.js covers how the snapshot computes awaitingBlock.
+// loadSnapshot is mocked; NextBlockAC55.test.js covers how the snapshot computes next-block time.
 const mocks = vi.hoisted(() => ({ snapshot: null }));
 vi.mock("./auction.js", async (importOriginal) => {
   const actual = await importOriginal();
@@ -74,6 +74,32 @@ describe("AC55: rendering while waiting for a new block", () => {
     expect(screen.getByRole("button", { name: "Bid" }).disabled).toBe(true);
     expect(bids.queryByRole("button", { name: "Cancel" })).toBeNull();
     expect(bids.getByRole("button", { name: "Claim tokens and refunds" }).disabled).toBe(false);
+  });
+
+  it("AC55: END passing between polls shows the ended status and disables Bid without a new poll", async () => {
+    // Only the 1 s render tick is kept; the 2 s poll never runs, so the snapshot stays as first read.
+    const ticks = [];
+    const realSetInterval = globalThis.setInterval;
+    vi.spyOn(globalThis, "setInterval").mockImplementation((fn, ms, ...rest) => {
+      if (ms === 1000) ticks.push(fn);
+      return ms === 1000 || ms === 2000 ? 0 : realSetInterval(fn, ms, ...rest); // waitFor keeps its own timers
+    });
+    let now = 1_700_000_000_000;
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+    // Step 19 at next-block time, so the standing bid (effective step 19) is already live.
+    mocks.snapshot = snapshot({ fetchedAt: now / 1000, nextBlockTime: END - 3 });
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Connect wallet" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Bid" }).disabled).toBe(false));
+    const bids = within(screen.getByRole("heading", { name: "My bids" }).closest("section"));
+    expect(screen.getByRole("heading", { name: "Active" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Finalize" })).toBeNull();
+    now += 5000; // the clock passes END; no poll runs
+    act(() => { for (const tick of ticks) tick(); });
+    expect(screen.getByRole("heading", { name: "Ended, waiting for a new block" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Bid" }).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: "Finalize" })).toBeTruthy();
+    expect(bids.getByRole("button", { name: "Claim tokens and refunds" })).toBeTruthy();
   });
 
   it("AC55 (control): before END the countdown runs from next-block time and actions stay open", async () => {

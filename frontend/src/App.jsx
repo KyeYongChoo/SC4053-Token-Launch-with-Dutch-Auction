@@ -451,7 +451,7 @@ export function BidForm({ snap, chainNow, disabled, onBid }) {
         <p className="warn-text small">
           {boundary.ends
             ? `The auction ends in ${boundary.seconds}s. A bid that confirms after that will fail.`
-            : `Price drops to ${fmtEth(boundary.nextPrice)} ETH in ${boundary.seconds}s. If your transaction confirms after that, it runs at step ${boundary.nextStep}.`}
+            : `Price drops to ${fmtEth(boundary.nextPrice)} ETH / token in ${boundary.seconds}s. If your transaction confirms after that, it runs at step ${boundary.nextStep}.`}
         </p>
       )}
       <p className="muted small">All winning bids pay the same clearing price.</p>

@@ -97,6 +97,11 @@ describe("AC58: confirmed bid steps come from the BidPlaced event", () => {
     expect(bidStepsFromReceipt(c, { logs: [transferLog(), placedLog(6n, 8n)] })).toEqual({ placedStep: 6, effectiveStep: 8 });
     expect(bidStepsFromReceipt(c, { logs: [placedLog(1n, 2n, "0x00000000000000000000000000000000000000bb")] })).toBeNull();
     expect(bidStepsFromReceipt(c, { logs: [transferLog()] })).toBeNull();
+    // Addresses compare case-insensitively: a checksummed contract address matches lowercase log addresses.
+    const MIXED = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+    const mixed = { target: MIXED, interface: IFACE };
+    expect(bidStepsFromReceipt(mixed, { logs: [placedLog(2n, 4n, MIXED.toLowerCase())] })).toEqual({ placedStep: 2, effectiveStep: 4 });
+    expect(bidStepsFromReceipt({ ...mixed, target: MIXED.toLowerCase() }, { logs: [placedLog(2n, 4n, MIXED)] })).toEqual({ placedStep: 2, effectiveStep: 4 });
     expect(bidStepsFromReceipt(c, null)).toBeNull();
   });
 });

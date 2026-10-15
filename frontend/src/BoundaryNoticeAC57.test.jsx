@@ -68,7 +68,7 @@ const ENDS = /^The auction ends in/;
 describe("AC57: step-boundary notices from next-block time", () => {
   it("AC57: 15 s before step k+1 the bid form shows the price-drop notice with price(k+1) and step k+1", async () => {
     await connected(snapshot(5, 345));
-    expect(screen.getByText("Price drops to 2.4 ETH in 15s. If your transaction confirms after that, it runs at step 6.")).toBeTruthy();
+    expect(screen.getByText("Price drops to 2.4 ETH / token in 15s. If your transaction confirms after that, it runs at step 6.")).toBeTruthy();
     expect(screen.queryByText(ENDS)).toBeNull();
   });
 
@@ -108,7 +108,7 @@ describe("AC57: step-boundary notices from next-block time", () => {
   it("AC57: the notice uses the displayed step from next-block time, not the latest block's step", async () => {
     // Latest block in step 5; next-block time 405 is in step 6, 15 s before step 7.
     const bids = await connected(snapshot(5, 405, { chainNow: 300, myBids: [bid("1", 7)] }));
-    expect(screen.getByText("Price drops to 2.3 ETH in 15s. If your transaction confirms after that, it runs at step 7.")).toBeTruthy();
+    expect(screen.getByText("Price drops to 2.3 ETH / token in 15s. If your transaction confirms after that, it runs at step 7.")).toBeTruthy();
     expect(within(rowOf(bids, "1")).getByText("Becomes live at step 7 in 15s; it can't be cancelled after that.")).toBeTruthy();
   });
 });

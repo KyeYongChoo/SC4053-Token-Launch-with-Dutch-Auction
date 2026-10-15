@@ -26,6 +26,7 @@ import {
   quoteBid,
   readContract,
   readProvider,
+  sendWithHeadroom,
   writeContract,
 } from "./auction.js";
 
@@ -158,11 +159,11 @@ export default function App() {
     return writeContract(await provider.getSigner());
   };
 
-  const run = async (label, send) => {
+  const run = async (label, method, ...args) => {
     setBusy(label);
     setNotice("");
     try {
-      const tx = await send(await signed());
+      const tx = await sendWithHeadroom(readProvider, await signed(), method, ...args);
       setNotice(`${label}: waiting for confirmation...`);
       await tx.wait();
       setNotice(`${label}: confirmed.`);
@@ -237,7 +238,7 @@ export default function App() {
             <section className="card">
               <h2>Finalize</h2>
               <p className="muted">The auction has ended. Anyone can finalize it to record the clearing result.</p>
-              <button className="primary" onClick={() => run("Finalize", (c) => c.finalize())} disabled={!canAct}>
+              <button className="primary" onClick={() => run("Finalize", "finalize")} disabled={!canAct}>
                 Finalize
               </button>
               {!account && <p className="muted small">Connect a wallet to finalize.</p>}
@@ -246,7 +247,7 @@ export default function App() {
           <PriceChart snap={snap} />
           <div className="grid2">
             <BidForm snap={snap} disabled={!canAct || snap.state !== 1 || snap.ended} onBid={(amt, max) =>
-              run("Bid", (c) => c.bid(parseEther(max), { value: parseEther(amt) }))
+              run("Bid", "bid", parseEther(max), { value: parseEther(amt) })
             } />
             {isOwner && <OwnerPanel snap={snap} canAct={canAct} run={run} />}
           </div>
@@ -254,8 +255,8 @@ export default function App() {
             snap={snap}
             account={account}
             canAct={canAct}
-            onCancel={(id) => run("Cancel", (c) => c.cancelBid(id))}
-            onClaim={() => run("Claim", (c) => c.claim())}
+            onCancel={(id) => run("Cancel", "cancelBid", id)}
+            onClaim={() => run("Claim", "claim")}
           />
           <BidFeed snap={snap} />
         </>
@@ -515,13 +516,13 @@ function OwnerPanel({ snap, canAct, run }) {
     <section className="card">
       <h2>Owner</h2>
       <div className="col">
-        <button disabled={!canAct || !canStart} onClick={() => run("Start", (c) => c.startAuction())}>
+        <button disabled={!canAct || !canStart} onClick={() => run("Start", "startAuction")}>
           Start auction
         </button>
-        <button disabled={!canAct || !canWithdraw} onClick={() => run("Withdraw proceeds", (c) => c.withdrawProceeds())}>
+        <button disabled={!canAct || !canWithdraw} onClick={() => run("Withdraw proceeds", "withdrawProceeds")}>
           Withdraw proceeds
         </button>
-        <button disabled={!canAct || !canSweep} onClick={() => run("Sweep", (c) => c.sweep())}>
+        <button disabled={!canAct || !canSweep} onClick={() => run("Sweep", "sweep")}>
           Sweep after claim deadline
         </button>
       </div>

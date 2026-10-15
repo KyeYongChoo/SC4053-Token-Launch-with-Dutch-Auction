@@ -24,6 +24,15 @@ export function quoteBid(bid, cl) {
   return { tokens, refund: eth - charged };
 }
 
+/**
+ * Displayed step at next-block time `t` (SPEC §6): min(floor((t − T0)/Δ), N − 1), never before the
+ * latest block's step. Only an active, unended, unsold auction moves ahead of the latest block.
+ */
+export function displayedStep(snap, t) {
+  if (snap.state !== 1 || snap.ended || snap.soldOut) return snap.cur;
+  return Math.max(snap.cur, Math.min(Math.floor((t - snap.startTime) / snap.stepSeconds), snap.stepCount - 1));
+}
+
 /** Which step a bid placed now at `maxPrice` would take, given the current step. */
 export function previewBid(snap, maxPrice) {
   if (maxPrice < snap.reservePrice) return { error: "Max price is below the reserve price." };

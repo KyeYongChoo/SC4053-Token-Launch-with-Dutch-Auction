@@ -17,6 +17,7 @@ import {
   DEPLOYMENT,
   STATE_NAMES,
   WAD,
+  displayedStep,
   fmtDuration,
   fmtEth,
   fmtTime,
@@ -173,6 +174,16 @@ export default function App() {
     }
   };
 
+  // Next-block time, advanced by the local clock between polls so countdowns move every second.
+  const chainNow = rawSnap ? (rawSnap.nextBlockTime ?? rawSnap.chainNow) + (Date.now() / 1000 - rawSnap.fetchedAt) : 0;
+  // What a transaction sent now would see: the displayed step, and the end once the next block
+  // would be at or past END (AC55).
+  const step = rawSnap ? displayedStep(rawSnap, chainNow) : 0;
+  const snap = useMemo(
+    () => rawSnap && { ...rawSnap, cur: step, ended: rawSnap.ended || Boolean(rawSnap.awaitingBlock) },
+    [rawSnap, step]
+  );
+
   if (!DEPLOYMENT.address) {
     return (
       <div className="page">
@@ -185,11 +196,7 @@ export default function App() {
     );
   }
 
-  // Once the next block would be at or past END, actions treat the auction as ended (AC55).
-  const snap = rawSnap?.awaitingBlock ? { ...rawSnap, ended: true } : rawSnap;
   const isOwner = Boolean(account) && snap && account.toLowerCase() === snap.owner.toLowerCase();
-  // Local clock estimate between polls, so countdowns move every second.
-  const chainNow = snap ? (snap.nextBlockTime ?? snap.chainNow) + (Date.now() / 1000 - snap.fetchedAt) : 0;
 
   return (
     <div className="page">
@@ -274,9 +281,7 @@ function StatusPanel({ snap, chainNow }) {
   const need = snap.prices[cur] ? (snap.prices[cur] * snap.supply) / WAD : 0n;
   const coverage = need > 0n ? Number((snap.demand[cur] * 10000n) / need) / 100 : 0;
   const endsIn = snap.endTime - chainNow;
-  // Count to the next boundary after chainNow, not after the latest block's step, which can lag (AC55).
-  const stepNow = Math.max(cur, Math.floor((chainNow - snap.startTime) / snap.stepSeconds));
-  const nextStepAt = snap.startTime + (stepNow + 1) * snap.stepSeconds;
+  const nextStepAt = snap.startTime + (cur + 1) * snap.stepSeconds;
   const nextIn = nextStepAt - chainNow;
 
   let headline = stateName;

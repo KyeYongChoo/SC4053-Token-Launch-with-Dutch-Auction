@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loadSnapshot, readProvider } from "./auction.js";
+import { displayedStep, loadSnapshot, readProvider } from "./auction.js";
 
 // AC55: the pending block's timestamp is the time the next block will get. The latest block stays
 // the pinned snapshot; next-block time only decides countdowns and whether the end has passed.
@@ -32,6 +32,7 @@ function blocks(pending) {
   vi.spyOn(readProvider, "send").mockImplementation(async (method, params) => {
     expect([method, params]).toEqual(["eth_getBlockByNumber", ["pending", false]]);
     if (pending instanceof Error) throw pending;
+    if (pending && "raw" in pending) return pending.raw;
     return pending && { number: null, hash: null, timestamp: "0x" + pending.timestamp.toString(16) };
   });
 }
@@ -58,6 +59,9 @@ describe("AC55: next-block time from the pending block", () => {
     ["unavailable", null],
     ["a failed request", new Error("pending not supported")],
     ["earlier than the latest block", { timestamp: LATEST.timestamp - 100 }],
+    ["malformed (bad hex timestamp)", { raw: { number: null, timestamp: "0xzz" } }],
+    ["malformed (no timestamp)", { raw: { number: null, hash: null } }],
+    ["malformed (not an object)", { raw: "pending" }],
   ]) {
     it(`AC55: falls back to the latest block's timestamp when the pending block is ${label}`, async () => {
       blocks(pending);
@@ -66,4 +70,26 @@ describe("AC55: next-block time from the pending block", () => {
       expect(snap.awaitingBlock).toBe(false);
     });
   }
+});
+
+describe("AC55: displayed step k = min(floor((t − T0)/Δ), N − 1)", () => {
+  const active = { state: 1, ended: false, soldOut: false, cur: 17, startTime: 0, stepSeconds: 60, stepCount: 20 };
+  it("AC55: follows next-block time into a later step", () => {
+    expect(displayedStep(active, 1080)).toBe(18); // first second of step 18
+    expect(displayedStep(active, 1139)).toBe(18);
+    expect(displayedStep(active, 1140)).toBe(19);
+  });
+  it("AC55: is capped at N − 1", () => {
+    expect(displayedStep(active, END)).toBe(19);
+    expect(displayedStep(active, END + 600)).toBe(19);
+  });
+  it("AC55: is never earlier than the latest block's step", () => {
+    expect(displayedStep(active, 1000)).toBe(17); // step 16 by time, 17 at the latest block
+  });
+  it("AC55: does not move ahead of the latest block unless active, unended and unsold", () => {
+    expect(displayedStep({ ...active, state: 0 }, 1140)).toBe(17);
+    expect(displayedStep({ ...active, ended: true }, 1140)).toBe(17);
+    expect(displayedStep({ ...active, soldOut: true }, 1140)).toBe(17); // a sell-out is not predicted
+    expect(displayedStep({ ...active, state: 2 }, 1140)).toBe(17);
+  });
 });

@@ -60,7 +60,7 @@ async function connected(snap) {
   fireEvent.click(screen.getByRole("button", { name: "Connect wallet" }));
   await waitFor(() => expect(screen.queryByText("Connect a wallet to see your bids.")).toBeNull());
   // Actions open once the wallet's chain check has finished; Claim or Cancel shows when it has.
-  await waitFor(() => expect(screen.getByRole("button", { name: /^(Claim tokens and refunds|Cancel)$/ }).disabled).toBe(false));
+  await waitFor(() => expect(screen.getAllByRole("button", { name: /^(Claim tokens and refunds|Cancel)$/ })[0].disabled).toBe(false));
   return within(screen.getByRole("heading", { name: "My bids" }).closest("section"));
 }
 
@@ -86,5 +86,48 @@ describe("AC55: rendering while waiting for a new block", () => {
     expect(screen.getByText("Next step in").nextSibling.textContent).toMatch(/^(30|29|28)s$/);
     expect(screen.getByRole("button", { name: "Bid" }).disabled).toBe(false);
     expect(bids.getByRole("button", { name: "Cancel" }).disabled).toBe(false);
+  });
+});
+
+describe("AC55: displayed step from next-block time", () => {
+  // The latest block is in step 17 (1039); the next block will be in step 18 (1090).
+  const joinsAt18 = { ...standing, id: "1", effectiveStep: 18 };
+  const ahead = () => snapshot({ nextBlockTime: 1090, myBids: [joinsAt18, standing] });
+  const stat = (label) => screen.getByText(label).nextSibling.textContent;
+  const rowOf = (bids, id) => bids.getAllByRole("row").find((row) => row.cells[0].textContent === id);
+
+  it("AC55: Current step and Current price show the displayed step k, not the latest block's step", async () => {
+    await connected(ahead());
+    expect(stat("Current step")).toBe("18 of 19");
+    expect(stat("Current price")).toMatch(/^1\.2 ETH/); // price(18) = 3 − 1.8
+  });
+
+  it("AC55: the next-step countdown runs to T0 + (k+1)Δ", async () => {
+    await connected(ahead());
+    expect(stat("Next step in")).toMatch(/^(50|49|48)s$/); // 1140 − 1090
+  });
+
+  it("AC55: a max price at price(k) previews as live", async () => {
+    await connected(ahead());
+    fireEvent.change(screen.getByLabelText(/max price/i), { target: { value: "1.2" } });
+    expect(screen.getByText(/Live bid at step 18/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/max price/i), { target: { value: "1.19" } });
+    expect(screen.getByText(/Standing order: activates at step 19/)).toBeTruthy();
+  });
+
+  it("AC55: a bid with effectiveStep = k shows Live with no Cancel button", async () => {
+    const bids = await connected(ahead());
+    const live = rowOf(bids, "1");
+    expect(within(live).getByText("Live")).toBeTruthy();
+    expect(within(live).queryByRole("button", { name: "Cancel" })).toBeNull();
+    const standingRow = rowOf(bids, "0");
+    expect(within(standingRow).getByText("Standing from step 19")).toBeTruthy();
+    expect(within(standingRow).getByRole("button", { name: "Cancel" }).disabled).toBe(false);
+  });
+
+  it("AC55 (control): with next-block time in the latest block's step, the latest step is displayed", async () => {
+    const bids = await connected(snapshot({ nextBlockTime: 1039, myBids: [joinsAt18, standing] }));
+    expect(stat("Current step")).toBe("17 of 19");
+    expect(within(rowOf(bids, "1")).getByRole("button", { name: "Cancel" }).disabled).toBe(false);
   });
 });

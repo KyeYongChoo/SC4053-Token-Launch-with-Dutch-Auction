@@ -3,7 +3,7 @@ import deployment from "./deployment.json";
 
 // Data access for the auction. The quote and preview maths (SPEC.md §2) live in maths.js, which
 // the contract tests also load, and are re-exported here. The contract remains the source of truth.
-export { WAD, previewBid, quoteBid } from "./maths.js";
+export { WAD, displayedStep, previewBid, quoteBid } from "./maths.js";
 
 export const DEPLOYMENT = deployment;
 export const RPC_URL = import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545";

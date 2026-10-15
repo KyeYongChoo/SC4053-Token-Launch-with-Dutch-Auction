@@ -29,3 +29,4 @@ Ethereum token launch: an ERC-20 sold by a 20-minute stepped Dutch auction with 
 - Views read the latest block. For exact step boundaries, use `time.setNextBlockTimestamp`, not `time.increaseTo`.
 - ethers v6 reserves `.target` for the contract address. Don't name contract getters `target`.
 - `npm install` on Windows rewrites `package-lock.json`. Check the diff before committing.
+- If MetaMask reports a transaction as failed but the UI shows it succeeded (the bid appears, for example), MetaMask is probably reading stale activity history: after a `hardhat node` restart, new transactions reuse nonces of reverted transactions from the old chain. Check the receipt on the node before debugging the app. The fix is MetaMask > Settings > Advanced > Clear activity tab data.

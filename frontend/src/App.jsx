@@ -48,8 +48,7 @@ export default function App() {
   const refresh = useCallback(async () => {
     if (!contract) return;
     const generation = ++refreshGeneration.current;
-    let readChain = null;
-    setRpcChainId(null);
+    let readChain = null; // Readiness stays while a routine poll runs; only failure or a mismatch clears it.
     try {
       readChain = Number((await readProvider.getNetwork()).chainId);
       if (generation !== refreshGeneration.current) return;
@@ -510,7 +509,8 @@ function MyBids({ snap, account, canAct, onCancel, onClaim }) {
 
 function OwnerPanel({ snap, canAct, run }) {
   const canStart = snap.state === 0;
-  const canWithdraw = !snap.proceedsWithdrawn && (snap.state === 2 || (snap.state === 1 && snap.ended));
+  const noProceeds = snap.state === 2 && snap.clearing.proceeds === 0n;
+  const canWithdraw = !snap.proceedsWithdrawn && !noProceeds && (snap.state === 2 || (snap.state === 1 && snap.ended));
   const canSweep = snap.state === 2 && snap.chainNow > snap.claimDeadline;
   return (
     <section className="card">
@@ -526,6 +526,7 @@ function OwnerPanel({ snap, canAct, run }) {
           Sweep after claim deadline
         </button>
       </div>
+      {noProceeds && <p className="muted small">No proceeds to withdraw.</p>}
       <p className="muted small">
         Claim deadline: {snap.claimDeadline ? fmtTime(snap.claimDeadline) : "set when the auction is finalized"}.
       </p>

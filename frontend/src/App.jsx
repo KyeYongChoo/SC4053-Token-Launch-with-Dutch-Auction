@@ -274,7 +274,9 @@ function StatusPanel({ snap, chainNow }) {
   const need = snap.prices[cur] ? (snap.prices[cur] * snap.supply) / WAD : 0n;
   const coverage = need > 0n ? Number((snap.demand[cur] * 10000n) / need) / 100 : 0;
   const endsIn = snap.endTime - chainNow;
-  const nextStepAt = snap.startTime + (cur + 1) * snap.stepSeconds;
+  // Count to the next boundary after chainNow, not after the latest block's step, which can lag (AC55).
+  const stepNow = Math.max(cur, Math.floor((chainNow - snap.startTime) / snap.stepSeconds));
+  const nextStepAt = snap.startTime + (stepNow + 1) * snap.stepSeconds;
   const nextIn = nextStepAt - chainNow;
 
   let headline = stateName;

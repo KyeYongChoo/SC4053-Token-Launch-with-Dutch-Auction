@@ -6,6 +6,7 @@ const IDS = [9007199254740992n, 9007199254740993n];
 const BLOCK = { number: 42, timestamp: 10_000 };
 function fixture() {
   vi.spyOn(readProvider, "getBlock").mockResolvedValue(BLOCK);
+  vi.spyOn(readProvider, "send").mockResolvedValue({ number: null, timestamp: "0x2710" }); // pending, AC55
   const values = { state: 1n, startTime: 9000n, endTime: 10200n, stepCount: 2n, stepDuration: 600n,
     supply: 10n ** 18n, currentStep: 1n, isEnded: false, soldOut: false, soldOutStep: 0n,
     owner: ACCOUNT, finalizedAt: 0n, proceedsWithdrawn: false, reservePrice: 1n, minBid: 1n,
@@ -28,8 +29,8 @@ describe("U04: one captured block per snapshot", () => {
     const { c, values } = fixture();
     const snap = await loadSnapshot(c, ACCOUNT);
     expect(snap.maxBidsPerAddress).toBe(100);
-    // The pinned block is the latest one; the pending block only supplies next-block time (AC55).
-    expect(readProvider.getBlock.mock.calls).toEqual([["latest"], ["pending"]]);
+    expect(readProvider.getBlock).toHaveBeenCalledTimes(1);
+    expect(readProvider.getBlock).toHaveBeenCalledWith("latest");
     for (const name of Object.keys(values)) {
       expect(c[name]).toHaveBeenCalledTimes(1);
       expect(c[name]).toHaveBeenCalledWith(...(name === "bidsOf" ? [ACCOUNT] : []), { blockTag: BLOCK.number });

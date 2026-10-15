@@ -25,9 +25,14 @@ function contract() {
 }
 function blocks(pending) {
   vi.spyOn(readProvider, "getBlock").mockImplementation(async (tag) => {
-    if (tag === "latest") return LATEST;
+    if (tag !== "latest") throw new Error(`unexpected getBlock(${tag})`);
+    return LATEST;
+  });
+  // Raw JSON-RPC, shaped as Hardhat returns it: hex quantities and a null number for pending.
+  vi.spyOn(readProvider, "send").mockImplementation(async (method, params) => {
+    expect([method, params]).toEqual(["eth_getBlockByNumber", ["pending", false]]);
     if (pending instanceof Error) throw pending;
-    return pending ?? null;
+    return pending && { number: null, hash: null, timestamp: "0x" + pending.timestamp.toString(16) };
   });
 }
 afterEach(() => vi.restoreAllMocks());

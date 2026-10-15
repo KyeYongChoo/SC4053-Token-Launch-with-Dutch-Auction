@@ -82,6 +82,8 @@ describe("AC55: rendering while waiting for a new block", () => {
     expect(screen.queryByRole("heading", { name: "Finalize" })).toBeNull();
     // Counting from the latest block (1039) would show 2m 41s.
     expect(screen.getByText("Auction ends in").nextSibling.textContent).toMatch(/^1m 2\ds$/);
+    // Next-block time 1110 is in step 18, though the latest block says 17: the next boundary is 1140.
+    expect(screen.getByText("Next step in").nextSibling.textContent).toMatch(/^(30|29|28)s$/);
     expect(screen.getByRole("button", { name: "Bid" }).disabled).toBe(false);
     expect(bids.getByRole("button", { name: "Cancel" }).disabled).toBe(false);
   });

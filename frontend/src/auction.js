@@ -21,6 +21,16 @@ export function writeContract(signer) {
 
 const range = (n) => Array.from({ length: n }, (_, i) => i);
 
+/** The pending block's timestamp in seconds, or 0 when the node cannot supply one. */
+async function pendingTimestamp() {
+  try {
+    const pending = await readProvider.send("eth_getBlockByNumber", ["pending", false]);
+    return pending?.timestamp ? Number(BigInt(pending.timestamp)) : 0;
+  } catch {
+    return 0;
+  }
+}
+
 /** Reads contract state and events at one captured block height. */
 export async function loadSnapshot(c, account) {
   const block = await readProvider.getBlock("latest");
@@ -29,8 +39,8 @@ export async function loadSnapshot(c, account) {
   const fetchedAt = Date.now() / 1000;
   // The pending block carries the timestamp the next block will get. A local chain that mines only
   // on transactions leaves the latest block behind real time, so countdowns run from this instead.
-  const pending = await readProvider.getBlock("pending").catch(() => null);
-  const nextBlockTime = Math.max(Number(block.timestamp), Number(pending?.timestamp ?? 0));
+  // Read it as raw JSON: Hardhat returns the pending block with number null, which getBlock rejects.
+  const nextBlockTime = Math.max(Number(block.timestamp), await pendingTimestamp());
 
   const [state, startTime, endTime, stepCount, stepSeconds, supply, cur, ended, soldOut, soldOutStep,
     owner, finalizedAt, proceedsWithdrawn, reservePrice, minBid, clearing, bidIds, claimDeadline, maxBidsPerAddress] = await Promise.all([

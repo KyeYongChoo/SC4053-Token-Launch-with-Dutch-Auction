@@ -38,8 +38,10 @@ async function ownerView(snap) {
   fireEvent.click(screen.getByRole("button", { name: "Connect wallet" }));
   await screen.findByText(/0x0000.*0002/);
   await act(async () => {});
-  // Sweep is enabled after the deadline, so the UI is ready and any disabled Withdraw is AC59's doing.
-  await waitFor(() => expect(screen.getByRole("button", { name: "Sweep after claim deadline" }).disabled).toBe(false));
+  // Sweep (after the deadline) or Finalize (ended, unfinalized) is enabled, so the UI is ready and any
+  // disabled Withdraw is AC59's doing.
+  const readyButton = snap.state === 2 ? "Sweep after claim deadline" : "Finalize";
+  await waitFor(() => expect(screen.getByRole("button", { name: readyButton }).disabled).toBe(false));
 }
 const withdrawButton = () => screen.getByRole("button", { name: "Withdraw proceeds" });
 
@@ -57,6 +59,17 @@ describe("AC59: zero proceeds disables Withdraw proceeds", () => {
   it("still disables Withdraw proceeds once nonzero proceeds are withdrawn", async () => {
     await ownerView(finalized(WAD, { proceedsWithdrawn: true }));
     expect(withdrawButton().disabled).toBe(true);
+    expect(screen.queryByText("No proceeds to withdraw.")).toBeNull();
+  });
+  it("disables Withdraw proceeds and explains why when zero proceeds were already withdrawn", async () => {
+    await ownerView(finalized(0n, { proceedsWithdrawn: true }));
+    expect(withdrawButton().disabled).toBe(true);
+    expect(screen.getByText("No proceeds to withdraw.")).toBeTruthy();
+  });
+  it("keeps Withdraw proceeds enabled for an ended, unfinalized auction with zero projected proceeds", async () => {
+    // SPEC §6: Withdraw is offered as for an ended, unfinalized auction; withdrawProceeds auto-finalizes (AC42).
+    await ownerView(finalized(0n, { state: 1, finalizedAt: 0, claimDeadline: 0 }));
+    expect(withdrawButton().disabled).toBe(false);
     expect(screen.queryByText("No proceeds to withdraw.")).toBeNull();
   });
 });

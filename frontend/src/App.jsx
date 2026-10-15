@@ -47,8 +47,7 @@ export default function App() {
   const refresh = useCallback(async () => {
     if (!contract) return;
     const generation = ++refreshGeneration.current;
-    let readChain = null;
-    setRpcChainId(null);
+    let readChain = null; // Readiness stays while a routine poll runs; only failure or a mismatch clears it.
     try {
       readChain = Number((await readProvider.getNetwork()).chainId);
       if (generation !== refreshGeneration.current) return;

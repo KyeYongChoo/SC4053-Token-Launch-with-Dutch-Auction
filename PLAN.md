@@ -169,7 +169,7 @@ U02 uses only the chain snapshot timestamp for claim eligibility, including the 
 
 Based on U01/U02 commit `efeb361a9e0dada00abbd125eb72526965326f17`, the frontend baseline passed 31 tests. The 21 new regressions produced 4 passes and 17 expected failures against unchanged App/data-access code. After the fixes, the same 21 tests passed and the full frontend suite passed 52 tests, including all U01/U02 controls. The production build succeeded. Temporarily removing the three refresh-generation checks caused all 3 delayed-refresh tests to fail; the original fixed source was then restored byte-for-byte. Tests use mocked provider/contract calls and controlled promise ordering, not live MetaMask/testnet or reorg evidence. Raw output, source snapshots, hashes and report corrections remain local under `evidence/audit-u03-u04/2026-10-13/` and are excluded from the commit.
 
-Only a matching-network successful latest refresh restores read readiness. Actions pause during refreshes, and slow RPCs can keep them disabled. Block heights are pinned, but reorg handling, incremental event indexing and transaction-inclusion races remain limitations. No new contract tests, gas benchmarks or Slither scan were run for this frontend group.
+Only a matching-network successful latest refresh restores read readiness. Routine polls for the same account keep actions enabled while they run; a failed or mismatched poll, an account or network change, or a signing check disables them (AC60, `frontend/src/ReadinessAC60.test.jsx`). Block heights are pinned, but reorg handling, incremental event indexing and transaction-inclusion races remain limitations. No new contract tests, gas benchmarks or Slither scan were run for this frontend group.
 
 ### D01 verification (2026-10-14)
 

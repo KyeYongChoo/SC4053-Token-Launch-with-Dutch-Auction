@@ -13,6 +13,7 @@ vi.mock("./auction.js", async (importOriginal) => ({ ...await importOriginal(),
   DEPLOYMENT: { address: "0x0000000000000000000000000000000000000001", chainId: 31337, abi: [] },
   readContract: () => ({}), readProvider: { getNetwork: () => mocks.rpc() },
   loadSnapshot: (...args) => mocks.snapshot(...args), writeContract: (...args) => mocks.write(...args),
+  sendWithHeadroom: (provider, c, method, ...args) => c[method](...args), // Gas headroom is covered by AC56 tests.
 }));
 const { default: App } = await import("./App.jsx");
 const originalEthereum = window.ethereum;

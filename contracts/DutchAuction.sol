@@ -116,6 +116,7 @@ contract DutchAuction is Ownable, ReentrancyGuard {
         require(stepDuration_ > 0 && AUCTION_DURATION % stepDuration_ == 0, "stepDuration");
         uint256 n = AUCTION_DURATION / stepDuration_;
         require(n >= 2 && n <= MAX_STEPS, "stepCount");
+        require(startPrice_ - reservePrice_ >= n - 1, "price spread"); // SPEC §2.1, AC9
 
         supply = supply_;
         startPrice = startPrice_;
@@ -149,8 +150,9 @@ contract DutchAuction is Ownable, ReentrancyGuard {
         require(!proceedsWithdrawn, "already withdrawn");
         proceedsWithdrawn = true;
         uint256 amount = clearing.proceeds;
-        _sendEth(owner(), amount);
-        emit ProceedsWithdrawn(owner(), amount);
+        address recipient = owner();
+        _sendEth(recipient, amount);
+        emit ProceedsWithdrawn(recipient, amount);
     }
 
     /// @notice After the claim deadline, burns unclaimed tokens and sends all remaining ETH to the owner.

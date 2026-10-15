@@ -21,46 +21,48 @@ export function writeContract(signer) {
 
 const range = (n) => Array.from({ length: n }, (_, i) => i);
 
-/** Reads everything the UI needs in one pass. */
+/** Reads contract state and events at one captured block height. */
 export async function loadSnapshot(c, account) {
   const block = await readProvider.getBlock("latest");
+  if (!block) throw new Error("Latest block is unavailable.");
+  const atBlock = { blockTag: block.number };
   const fetchedAt = Date.now() / 1000;
 
   const [state, startTime, endTime, stepCount, stepSeconds, supply, cur, ended, soldOut, soldOutStep,
     owner, finalizedAt, proceedsWithdrawn, reservePrice, minBid, clearing, bidIds, claimDeadline, maxBidsPerAddress] = await Promise.all([
-    c.state(),
-    c.startTime(),
-    c.endTime(),
-    c.stepCount(),
-    c.stepDuration(),
-    c.supply(),
-    c.currentStep(),
-    c.isEnded(),
-    c.soldOut(),
-    c.soldOutStep(),
-    c.owner(),
-    c.finalizedAt(),
-    c.proceedsWithdrawn(),
-    c.reservePrice(),
-    c.minBid(),
-    c.clearing(),
-    account ? c.bidsOf(account) : Promise.resolve([]),
-    c.claimDeadline(),
-    c.MAX_BIDS_PER_ADDRESS(),
+    c.state(atBlock),
+    c.startTime(atBlock),
+    c.endTime(atBlock),
+    c.stepCount(atBlock),
+    c.stepDuration(atBlock),
+    c.supply(atBlock),
+    c.currentStep(atBlock),
+    c.isEnded(atBlock),
+    c.soldOut(atBlock),
+    c.soldOutStep(atBlock),
+    c.owner(atBlock),
+    c.finalizedAt(atBlock),
+    c.proceedsWithdrawn(atBlock),
+    c.reservePrice(atBlock),
+    c.minBid(atBlock),
+    c.clearing(atBlock),
+    account ? c.bidsOf(account, atBlock) : Promise.resolve([]),
+    c.claimDeadline(atBlock),
+    c.MAX_BIDS_PER_ADDRESS(atBlock),
   ]);
 
   const N = Number(stepCount);
   const [prices, demand, joins] = await Promise.all([
-    Promise.all(range(N).map((k) => c.priceAt(k))),
-    Promise.all(range(N).map((k) => c.demandAt(k))),
-    Promise.all(range(N).map((k) => c.stepJoinAmount(k))),
+    Promise.all(range(N).map((k) => c.priceAt(k, atBlock))),
+    Promise.all(range(N).map((k) => c.demandAt(k, atBlock))),
+    Promise.all(range(N).map((k) => c.stepJoinAmount(k, atBlock))),
   ]);
 
   const myBids = await Promise.all(
     bidIds.map(async (id) => {
-      const b = await c.getBid(id);
+      const b = await c.getBid(id, atBlock);
       return {
-        id: Number(id),
+        id: id.toString(),
         bidder: b.bidder,
         ethAmount: b.ethAmount,
         maxPrice: b.maxPrice,
@@ -74,8 +76,8 @@ export async function loadSnapshot(c, account) {
 
   const fromBlock = DEPLOYMENT.deployBlock ?? 0;
   const [placed, cancelled] = await Promise.all([
-    c.queryFilter(c.filters.BidPlaced(), fromBlock),
-    c.queryFilter(c.filters.BidCancelled(), fromBlock),
+    c.queryFilter(c.filters.BidPlaced(), fromBlock, block.number),
+    c.queryFilter(c.filters.BidCancelled(), fromBlock, block.number),
   ]);
   const cancelledIds = new Set(cancelled.map((e) => e.args.bidId.toString()));
   const feed = placed

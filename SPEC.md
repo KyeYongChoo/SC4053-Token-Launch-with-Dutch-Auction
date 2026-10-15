@@ -18,7 +18,7 @@ Notation: `S` = token supply (token-wei, 18 decimals), `P0` = start price, `R` =
 ## 2. Business rules
 **Fixed choices:** Solidity smart contracts on the EVM; ERC-20 token; MetaMask wallet; local dev chain plus Sepolia. Frameworks and libraries are left to implementation (stack-agnostic).
 
-1. **Parameters**: constructor args `tokenName, tokenSymbol, S, P0, R, Δ, minBid`, all immutable. Total duration is fixed at 1200 s, the claim period is fixed at 30 days, and each address may place at most `MAX_BIDS_PER_ADDRESS = 100` bids (rule 13). The constructor reverts unless `P0 > R > 0`, `S > 0`, `minBid > 0`, `1200 % Δ == 0`, `2 ≤ N ≤ 120`, `S ≤ 1e30` token-wei (1e12 tokens), and `P0 ≤ 1e24` wei (1e6 ETH per token). The bounds keep price × supply × 1e18 inside uint256.
+1. **Parameters**: constructor args `tokenName, tokenSymbol, S, P0, R, Δ, minBid`, all immutable. Total duration is fixed at 1200 s, the claim period is fixed at 30 days, and each address may place at most `MAX_BIDS_PER_ADDRESS = 100` bids (rule 13). The constructor reverts unless `P0 > R > 0`, `P0 − R ≥ N − 1` wei, `S > 0`, `minBid > 0`, `1200 % Δ == 0`, `2 ≤ N ≤ 120`, `S ≤ 1e30` token-wei (1e12 tokens), and `P0 ≤ 1e24` wei (1e6 ETH per token). The price-spread constraint ensures every integer step price decreases by at least one wei, as required by AC9. The bounds keep price × supply × 1e18 inside uint256.
 2. **Price schedule (linear steps)**: `step(t) = floor((t − T0) / Δ)` for `T0 ≤ t < END`. `price(k) = P0 − floor(k·(P0 − R)/(N − 1))`, so `price(0) = P0` and `price(N−1) = R`, which is live for the final Δ seconds.
 3. **Bid** = `(ethAmount = msg.value, maxPrice)`. Validation: auction Active and not ended; `msg.value ≥ minBid`; `maxPrice ≥ R`; the caller has placed fewer than `MAX_BIDS_PER_ADDRESS` bids.
 4. **Snapping**: `maxStep m` = the smallest k with `price(k) ≤ maxPrice` (the price rounds down to a step price). If `maxPrice ≥ P0` then `m = 0`.
@@ -31,12 +31,14 @@ Notation: `S` = token supply (token-wei, 18 decimals), `P0` = start price, `R` =
     - Not sold out (undersold at reserve): every bid is filled in full. Fill fraction = 1.
     - Sold out with `A ≥ Need`: bids with `e < c` are filled pro-rata with `f = Need / A`. Bids with `e == c` get f = 0 and a full refund.
     - Sold out with `A < Need`: bids with `e < c` get f = 1. Bids with `e == c` get pro-rata `f = (Need − A) / J`.
-11. **Per-bid settlement**: `tokens = floor(eth·f·1e18 / price(c))`. The ETH charged is `ceil(eth·f)`, so the bidder overpays by at most 1 wei. `refund = eth − charged`. Cancelled bids are excluded because they were already refunded.
+11. **Per-bid settlement**: `tokens = floor(eth·f·1e18 / price(c))`. The ETH charged is `ceil(eth·f)`, less than one wei above the ideal fractional ETH charge; this is not a bound on payment relative to the rounded token allocation. A sufficiently small bid can be charged while receiving zero token-wei. `refund = eth − charged`. Cancelled bids are excluded because they were already refunded.
 12. **Cancel**: only the bidder who placed it, only while the auction has not ended, and only while `currentStep < e`. Live bids can never be cancelled. Cancelling refunds the full ETH immediately.
 13. **Multiple bids**: an address may place up to `MAX_BIDS_PER_ADDRESS = 100` bids, each with a unique incremental `bidId`. Every bid placed counts toward the cap, including cancelled bids, because `claim` still walks them. The cap bounds the gas of `claim`, which settles all of the caller's bids in one transaction: without it, an address with more bids than fit under the EIP-7825 per-transaction gas cap (2^24) could never claim, and its tokens and refunds would be swept after the deadline. One address is limited, not one person; a bidder needing more uses another address.
 14. **Finalize**: callable by anyone once the auction has ended, and only once. It is also run automatically by `claim` and `withdrawProceeds` if nobody has called it yet. It records `c`, `price(c)`, the tier fractions, `tokensSold = min(S, floor(D_filled·1e18/price(c)))`, `proceeds`, and `finalizedAt`. It burns `S − tokensSold`.
 15. **Claim window**: `deadline = finalizedAt + 30 days`. `claim` is allowed while `now ≤ deadline`. `sweep` is allowed when `now > deadline`.
-16. **Rounding dust**: token amounts round down and ETH charges round up. The contract can therefore always pay every claim and the owner's proceeds. Leftover token dust is burned at `sweep`, and leftover wei goes to the owner at `sweep`.
+16. **Rounding dust**: token amounts round down and ETH charges round up. The contract can therefore always pay every claim and the owner's proceeds. After every non-cancelled bid is claimed and proceeds are withdrawn, before sweep and with no unsolicited ETH, residual ETH is strictly less than `B + ceil(P / 1e18)` wei, where `B` is the number of non-cancelled bids (including bids ineligible at clearing) and `P` is the clearing price in wei per whole token. This is an absolute bound, not a guarantee that residual ETH is small relative to a tiny bid. Leftover token dust is burned at `sweep`, and leftover wei goes to the owner at `sweep`.
+
+    Derivation: for an undersold auction, let `D` be total non-cancelled bid ETH. Charges sum to `D`, aggregate tokens sold are `floor(D·1e18/P)`, and residual is `D − floor(P·floor(D·1e18/P)/1e18) < ceil(P/1e18)`. For either sold-out tier branch, ideal charges sum to `P·S/1e18`. Rounding each charge up and aggregate proceeds down leaves at most `B` wei (the integer residual is less than `B + 1`). The combined strict bound covers both cases, including no bids. Unclaimed liabilities and unsolicited ETH are excluded.
 17. **Reentrancy**: every function that sends ETH follows checks-effects-interactions and has a reentrancy guard. All payouts are pull-based.
 
 ## 3. Money flows
@@ -70,6 +72,8 @@ ETH is never sent in a loop over bidders. Nobody can withdraw another party's ET
 
 **Events**: `AuctionStarted(startTime, endTime)`; `BidPlaced(bidId, bidder, ethAmount, maxPrice, placedStep, effectiveStep)`; `BidCancelled(bidId, bidder, refund)`; `SoldOut(step, price)`; `AuctionFinalized(clearingStep, clearingPrice, tokensSold, tokensBurned, soldOut)`; `Claimed(bidder, tokens, refund)`; `ProceedsWithdrawn(owner, amount)`; `AuctionSwept(tokensBurned, ethToOwner)`.
 
+`ProceedsWithdrawn.owner` identifies the payout recipient captured before the ETH transfer, even if that recipient transfers ownership during its receive callback. Ownership transfers remain permitted.
+
 **Test-only (bonus)**: `VulnerableAuction` has the same claim logic but sends ETH before marking the claim done and has no guard. `ReentrancyAttacker` re-enters `claim` from `receive()`.
 
 ## 5. State machine
@@ -85,11 +89,12 @@ Ended ──finalize() / auto──▶ Finalized ──now > finalizedAt+30d, sw
 - **Swept**: views only.
 
 ## 6. Front end
-- MetaMask connect. Works against the local chain and Sepolia. The RPC URL comes from the environment. The chain ID comes from the generated deployment file (`frontend/src/deployment.json`). Shows a warning on the wrong chain.
+- MetaMask connect. Works against the local chain and Sepolia. The RPC URL comes from the environment. The chain ID comes from the generated deployment file (`frontend/src/deployment.json`). Transaction actions require both the wallet and read RPC to match that chain, a successful current snapshot and no pending transaction. Unknown, mismatched or failed network/read checks disable actions. Both providers are checked again before obtaining the signer. Shows a warning on the wrong chain.
+- **Data refreshes**: capture one latest block, use its number for every contract read and as the upper bound for event queries, and use its timestamp for chain-time eligibility. An unavailable block fails the refresh. Bid IDs remain exact decimal strings through display and cancellation. Only the latest refresh for the current account may publish data or restore action readiness; older responses and responses invalidated by account/network changes or signing checks are ignored. Block-number pinning does not guarantee consistency across reorgs.
 - **Bid form**: an ETH amount box, a max-price box (with a "buy at any price" shortcut that sets it to P0), and a Bid button. Shows a live preview of the snapped step price and whether the bid is live or standing.
 - **Price line chart**: the full stepped schedule P0 → R with a "now" marker; a demand overlay line (`D(k)·1e18/S`, the price at which current demand buys all supply); the standing-order ladder (ETH waiting at each future step); and the clearing point highlighted after finalize.
 - **Status panel**: state, current price, countdown to the next step and to the end, ETH committed, % of supply covered at the current price.
-- **My bids**: each bid with its status (live / standing / cancelled / claimed), a Cancel button where allowed, an estimated tokens and refund, and a Claim button after the end. Shows the claim deadline.
+- **My bids**: each bid with its status (live / standing / cancelled / claimed), a Cancel button where allowed, an estimated tokens and refund, and a Claim button after the end. An uncancelled, unclaimed bid remains live while the auction is active once `effectiveStep ≤ currentStep`; only a future effective step is standing. Shows the claim deadline. For finalized auctions, Claim is available through the deadline using the chain snapshot timestamp, not the browser clock; after expiry it is hidden and the UI explains that unclaimed tokens and ETH may be swept. Ended, unfinalized auctions may still offer Claim to auto-finalize and start the claim window. Swept auctions never offer Claim.
 - **Owner panel** (owner only): Start, Withdraw proceeds, Sweep (enabled after the deadline). A Finalize button is visible to everyone once the auction has ended.
 - **Public bid feed**: live list from events (bidder, ETH, max price, placed/effective step, cancelled).
 
@@ -98,7 +103,7 @@ Example params where useful: `S = 1000e18`, `P0 = 1 ETH`, `R = 0.1 ETH`, `Δ = 3
 
 **Deployment and start**
 1. Given valid params, when deployed, then the token supply = S, held entirely by the auction, the owner = deployer, and state = Created.
-2. Given `P0 ≤ R`, or `R = 0`, or `S = 0`, or `minBid = 0`, or `1200 % Δ ≠ 0`, or `N < 2`, or `N > 120`, or `S > 1e30`, or `P0 > 1e24`, when deployed, then it reverts.
+2. Given `P0 ≤ R`, or `R = 0`, or `P0 − R < N − 1` wei, or `S = 0`, or `minBid = 0`, or `1200 % Δ ≠ 0`, or `N < 2`, or `N > 120`, or `S > 1e30`, or `P0 > 1e24`, when deployed, then it reverts.
 3. Given Created, when a non-owner calls `startAuction`, then it reverts. When the owner calls it, then `T0 = block.timestamp`, `END = T0+1200`, state = Active, and `AuctionStarted` is emitted.
 4. Given Active, when `startAuction` is called again, then it reverts.
 5. Given Created, when `bid` is called, then it reverts.
@@ -152,20 +157,20 @@ Example params where useful: `S = 1000e18`, `P0 = 1 ETH`, `R = 0.1 ETH`, `Δ = 3
 41. Given Created or Active (not ended), when `claim` is called, then it reverts.
 
 **Owner payouts**
-42. Given ended, when the owner calls `withdrawProceeds`, then it auto-finalizes and sends exactly `proceeds`. A second call reverts. A non-owner reverts.
+42. Given ended, when the owner calls `withdrawProceeds`, then it auto-finalizes and sends exactly `proceeds`. `ProceedsWithdrawn` identifies the actual payout recipient and amount, including when ownership transfers during the payout callback. A second call reverts. A non-owner reverts.
 43. Given Finalized, when the owner calls `sweep` at `now = finalizedAt + 30 days`, then it reverts. At `+1 s`, all remaining tokens are burned, the whole ETH balance goes to the owner, and state = Swept. A second sweep reverts. A non-owner reverts.
 44. Given an owner who never withdrew proceeds, when sweeping, then the proceeds are included in the ETH sent.
-45. After all claims and the withdrawal, the contract ETH balance is ≥ 0 and every claim succeeds (solvency), with any remainder ≤ 1 wei per bid.
+45. Every claim and proceeds withdrawal remains solvent. After all non-cancelled bids are claimed and proceeds withdrawn, before sweep and without unsolicited ETH, residual ETH is `< B + ceil(P/1e18)` wei (definitions in rule 16). Undersold residual is `< ceil(P/1e18)`; sold-out residual is `≤ B`. A legal high-price tiny bid may receive zero token-wei despite a nonzero charge. Sweep transfers the remaining ETH to the owner after the deadline.
 
 **Reentrancy (bonus)**
 46. Given `VulnerableAuction` and `ReentrancyAttacker` holding a bid, when the attacker claims, then it drains more ETH than its refund.
 47. Given the real `DutchAuction`, when the attacker re-enters `claim`, `cancelBid`, `withdrawProceeds` or `sweep` from `receive()`, then the re-entrant call reverts and balances stay correct.
 
 **Front end**
-48. Given a wallet on the wrong chain, then the UI shows a switch-network prompt and disables actions.
+48. Given a wallet on the wrong chain, then the UI shows a switch-network prompt and disables actions. Actions also remain disabled unless the read RPC matches the deployment chain and a current snapshot was read successfully. A changed or failed provider check before signing prevents transaction submission; stale refresh responses cannot restore readiness.
 49. Given Active, then the chart shows all N steps, a "now" marker, a demand line and a standing-order ladder, refreshed on new events or every step.
 50. Given a max price entered below the current price, then the form labels the bid "standing order at step j, price X".
-51. Given Finalized, then the chart marks the clearing point, My bids shows the exact claimable tokens and refund, and the deadline is displayed.
+51. Given Finalized, then the chart marks the clearing point, My bids shows the exact claimable tokens and refund, and the deadline is displayed. With outstanding bids, Claim is available when the chain snapshot timestamp is at or before the deadline; afterward it is hidden and expiry/sweep eligibility is explained.
 52. Given a non-owner wallet, then the owner panel is hidden.
 
 **Bid cap**

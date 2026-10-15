@@ -190,7 +190,7 @@ describe("AC48: wrong-network wallet", function () {
   const OWNER_CREATED = { ...ENDED_SNAPSHOT, state: 0, cur: 0, ended: false, owner: ACCOUNT };
   const cases = [
     ["Cancel", OWNER_LIVE],
-    ["Claim tokens and refunds", OWNER_FINALIZED],
+    ["Claim tokens and refunds", { ...OWNER_FINALIZED, chainNow: 1500 }], // Claim is inside its window; sweep uses the expired fixture.
     ["Withdraw proceeds", OWNER_FINALIZED],
     ["Sweep after claim deadline", OWNER_FINALIZED],
     ["Start auction", OWNER_CREATED],

@@ -3,7 +3,7 @@ import deployment from "./deployment.json";
 
 // Data access for the auction. The quote and preview maths (SPEC.md §2) live in maths.js, which
 // the contract tests also load, and are re-exported here. The contract remains the source of truth.
-export { WAD, displayedStep, previewBid, quoteBid } from "./maths.js";
+export { WAD, boundaryNotice, displayedStep, previewBid, quoteBid } from "./maths.js";
 
 export const DEPLOYMENT = deployment;
 export const RPC_URL = import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545";
@@ -17,6 +17,23 @@ export function readContract() {
 
 export function writeContract(signer) {
   return new Contract(DEPLOYMENT.address, DEPLOYMENT.abi, signer);
+}
+
+/** Placed and effective step from the BidPlaced event in a mined receipt (SPEC §6, AC58), or null. */
+export function bidStepsFromReceipt(c, receipt) {
+  for (const log of receipt?.logs ?? []) {
+    if (log.address?.toLowerCase() !== String(c.target).toLowerCase()) continue;
+    let parsed = null;
+    try {
+      parsed = c.interface.parseLog(log);
+    } catch {
+      continue;
+    }
+    if (parsed?.name === "BidPlaced") {
+      return { placedStep: Number(parsed.args.placedStep), effectiveStep: Number(parsed.args.effectiveStep) };
+    }
+  }
+  return null;
 }
 
 const range = (n) => Array.from({ length: n }, (_, i) => i);

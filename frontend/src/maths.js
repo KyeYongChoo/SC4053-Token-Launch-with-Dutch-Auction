@@ -27,6 +27,30 @@ export function quoteBid(bid, cl) {
   return { tokens, refund: eth - charged };
 }
 
+/**
+ * Displayed step at next-block time `t` (SPEC §6): min(floor((t − T0)/Δ), N − 1), never before the
+ * latest block's step. Only an active, unended, unsold auction moves ahead of the latest block.
+ */
+export function displayedStep(snap, t) {
+  if (snap.state !== 1 || snap.ended || snap.soldOut) return snap.cur;
+  return Math.max(snap.cur, Math.min(Math.floor((t - snap.startTime) / snap.stepSeconds), snap.stepCount - 1));
+}
+
+export const NOTICE_SECONDS = 15;
+
+/**
+ * Step-boundary notice at next-block time `t` (SPEC §6, AC57), or null. `snap.cur` is the displayed
+ * step k. Shown while Active once the next boundary is NOTICE_SECONDS or less away; advisory only.
+ */
+export function boundaryNotice(snap, t) {
+  if (snap.state !== 1 || snap.ended || snap.soldOut) return null;
+  const k = snap.cur;
+  const seconds = Math.ceil(snap.startTime + (k + 1) * snap.stepSeconds - t);
+  if (seconds <= 0 || seconds > NOTICE_SECONDS) return null;
+  if (k >= snap.stepCount - 1) return { ends: true, seconds };
+  return { ends: false, seconds, nextStep: k + 1, nextPrice: snap.prices[k + 1] };
+}
+
 /** Which step a bid placed now at `maxPrice` would take, given the current step. */
 export function previewBid(snap, maxPrice) {
   if (maxPrice < snap.reservePrice) return { error: "Max price is below the reserve price." };

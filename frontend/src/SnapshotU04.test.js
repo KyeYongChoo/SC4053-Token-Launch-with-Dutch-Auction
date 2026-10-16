@@ -6,6 +6,7 @@ const IDS = [9007199254740992n, 9007199254740993n];
 const BLOCK = { number: 42, timestamp: 10_000 };
 function fixture() {
   vi.spyOn(readProvider, "getBlock").mockResolvedValue(BLOCK);
+  vi.spyOn(readProvider, "send").mockResolvedValue({ number: null, timestamp: "0x2710" }); // pending, AC55
   const values = { state: 1n, startTime: 9000n, endTime: 10200n, stepCount: 2n, stepDuration: 600n,
     supply: 10n ** 18n, currentStep: 1n, isEnded: false, soldOut: false, soldOutStep: 0n,
     owner: ACCOUNT, finalizedAt: 0n, proceedsWithdrawn: false, reservePrice: 1n, minBid: 1n,

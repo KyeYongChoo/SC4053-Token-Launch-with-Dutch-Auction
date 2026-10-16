@@ -17,6 +17,9 @@ import {
   DEPLOYMENT,
   STATE_NAMES,
   WAD,
+  bidStepsFromReceipt,
+  boundaryNotice,
+  displayedStep,
   fmtDuration,
   fmtEth,
   fmtTime,
@@ -38,7 +41,7 @@ export default function App() {
   const [account, setAccount] = useState("");
   const [chainId, setChainId] = useState(null);
   const [rpcChainId, setRpcChainId] = useState(null);
-  const [snap, setSnap] = useState(null);
+  const [rawSnap, setSnap] = useState(null);
   const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
@@ -158,14 +161,15 @@ export default function App() {
     return writeContract(await provider.getSigner());
   };
 
-  const run = async (label, method, ...args) => {
+  const run = async (label, method, args = [], confirmed) => {
     setBusy(label);
     setNotice("");
     try {
-      const tx = await sendWithHeadroom(readProvider, await signed(), method, ...args);
+      const c = await signed();
+      const tx = await sendWithHeadroom(readProvider, c, method, ...args);
       setNotice(`${label}: waiting for confirmation...`);
-      await tx.wait();
-      setNotice(`${label}: confirmed.`);
+      const receipt = await tx.wait();
+      setNotice(`${label}: confirmed.${confirmed?.(c, receipt) ?? ""}`);
     } catch (e) {
       setNotice(`${label} failed: ${e.reason ?? e.shortMessage ?? e.message}`);
     } finally {
@@ -173,6 +177,17 @@ export default function App() {
       await refresh();
     }
   };
+
+  // Next-block time, advanced by the local clock between polls so countdowns move every second.
+  const chainNow = rawSnap ? (rawSnap.nextBlockTime ?? rawSnap.chainNow) + (Date.now() / 1000 - rawSnap.fetchedAt) : 0;
+  // What a transaction sent now would see: the displayed step, and the end once the next block
+  // would be at or past END (AC55). Both follow the advancing clock, so END passing between polls counts.
+  const step = rawSnap ? displayedStep(rawSnap, chainNow) : 0;
+  const awaitingBlock = Boolean(rawSnap) && rawSnap.state === 1 && !rawSnap.ended && chainNow >= rawSnap.endTime;
+  const snap = useMemo(
+    () => rawSnap && { ...rawSnap, cur: step, awaitingBlock, ended: rawSnap.ended || awaitingBlock },
+    [rawSnap, step, awaitingBlock]
+  );
 
   if (!DEPLOYMENT.address) {
     return (
@@ -187,8 +202,6 @@ export default function App() {
   }
 
   const isOwner = Boolean(account) && snap && account.toLowerCase() === snap.owner.toLowerCase();
-  // Local clock estimate between polls, so countdowns move every second.
-  const chainNow = snap ? snap.chainNow + (Date.now() / 1000 - snap.fetchedAt) : 0;
 
   return (
     <div className="page">
@@ -237,6 +250,9 @@ export default function App() {
             <section className="card">
               <h2>Finalize</h2>
               <p className="muted">The auction has ended. Anyone can finalize it to record the clearing result.</p>
+              {snap.awaitingBlock && (
+                <p className="muted small">No block has been mined since the end yet; the next transaction closes the auction.</p>
+              )}
               <button className="primary" onClick={() => run("Finalize", "finalize")} disabled={!canAct}>
                 Finalize
               </button>
@@ -245,16 +261,17 @@ export default function App() {
           )}
           <PriceChart snap={snap} />
           <div className="grid2">
-            <BidForm snap={snap} disabled={!canAct || snap.state !== 1 || snap.ended} onBid={(amt, max) =>
-              run("Bid", "bid", parseEther(max), { value: parseEther(amt) })
+            <BidForm snap={snap} chainNow={chainNow} disabled={!canAct || snap.state !== 1 || snap.ended} onBid={(amt, max) =>
+              run("Bid", "bid", [parseEther(max), { value: parseEther(amt) }], bidConfirmed)
             } />
             {isOwner && <OwnerPanel snap={snap} canAct={canAct} run={run} />}
           </div>
           <MyBids
             snap={snap}
+            chainNow={chainNow}
             account={account}
             canAct={canAct}
-            onCancel={(id) => run("Cancel", "cancelBid", id)}
+            onCancel={(id) => run("Cancel", "cancelBid", [id])}
             onClaim={() => run("Claim", "claim")}
           />
           <BidFeed snap={snap} />
@@ -275,6 +292,7 @@ function StatusPanel({ snap, chainNow }) {
 
   let headline = stateName;
   if (snap.state === 1 && snap.soldOut) headline = `Sold out at step ${snap.soldOutStep}`;
+  else if (snap.awaitingBlock) headline = "Ended, waiting for a new block";
   else if (snap.state === 1 && snap.ended) headline = "Ended, not finalized";
   else if (snap.state === 2) headline = "Finalized";
   else if (snap.state === 3) headline = "Swept";
@@ -368,7 +386,13 @@ function PriceChart({ snap }) {
   );
 }
 
-export function BidForm({ snap, disabled, onBid }) {
+// The steps a confirmed bid actually got, from its BidPlaced event, not the preview (AC58).
+function bidConfirmed(c, receipt) {
+  const steps = bidStepsFromReceipt(c, receipt);
+  return steps ? ` Placed at step ${steps.placedStep}, effective step ${steps.effectiveStep}.` : "";
+}
+
+export function BidForm({ snap, chainNow, disabled, onBid }) {
   const [amount, setAmount] = useState("1");
   const [maxPrice, setMaxPrice] = useState(() => formatEther(snap.prices[0]));
 
@@ -395,6 +419,7 @@ export function BidForm({ snap, disabled, onBid }) {
     (!amountOk && "Amount is below the minimum bid.") ||
     "";
   const canSubmit = !disabled && !err;
+  const boundary = boundaryNotice(snap, chainNow);
 
   return (
     <section className="card">
@@ -423,6 +448,14 @@ export function BidForm({ snap, disabled, onBid }) {
           </span>
         )}
       </div>
+      {boundary && (
+        <p className="warn-text small">
+          {boundary.ends
+            ? `The auction ends in ${boundary.seconds}s. A bid that confirms after that will fail.`
+            : `Price drops to ${fmtEth(boundary.nextPrice)} ETH / token in ${boundary.seconds}s. If your transaction confirms after that, it runs at step ${boundary.nextStep}.`}
+        </p>
+      )}
+      <p className="muted small">All winning bids pay the same clearing price.</p>
       <button className="primary" disabled={!canSubmit} onClick={() => onBid(amount, maxPrice)}>
         Bid
       </button>
@@ -431,13 +464,14 @@ export function BidForm({ snap, disabled, onBid }) {
   );
 }
 
-function MyBids({ snap, account, canAct, onCancel, onClaim }) {
+function MyBids({ snap, chainNow, account, canAct, onCancel, onClaim }) {
   if (!account) return <section className="card"><h2>My bids</h2><p className="muted">Connect a wallet to see your bids.</p></section>;
 
   const finalized = snap.state >= 2 && snap.clearing.price > 0n;
   const hasClaimable = snap.myBids.some((b) => !b.cancelled && !b.claimed);
   const claimExpired = snap.state === 2 && snap.chainNow > snap.claimDeadline;
   const claimable = hasClaimable && ((snap.state === 2 && !claimExpired) || (snap.state === 1 && snap.ended));
+  const boundary = boundaryNotice(snap, chainNow);
 
   return (
     <section className="card">
@@ -491,6 +525,11 @@ function MyBids({ snap, account, canAct, onCancel, onClaim }) {
                     <td>
                       {cancellable && (
                         <button onClick={() => onCancel(b.id)} disabled={!canAct}>Cancel</button>
+                      )}
+                      {cancellable && boundary && !boundary.ends && b.effectiveStep === boundary.nextStep && (
+                        <span className="warn-text small">
+                          {" "}Becomes live at step {boundary.nextStep} in {boundary.seconds}s; it can't be cancelled after that.
+                        </span>
                       )}
                     </td>
                   </tr>

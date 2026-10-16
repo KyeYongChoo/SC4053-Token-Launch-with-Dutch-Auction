@@ -4,7 +4,7 @@ import deployment from "./deployment.json";
 // Data access for the auction. The quote and preview maths (SPEC.md §2) live in maths.js, which
 // the contract tests also load, and are re-exported here. The contract remains the source of truth.
 import { gasLimitFor } from "./maths.js";
-export { WAD, gasLimitFor, previewBid, quoteBid } from "./maths.js";
+export { WAD, boundaryNotice, displayedStep, gasLimitFor, previewBid, quoteBid } from "./maths.js";
 
 export const DEPLOYMENT = deployment;
 export const RPC_URL = import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545";
@@ -18,6 +18,23 @@ export function readContract() {
 
 export function writeContract(signer) {
   return new Contract(DEPLOYMENT.address, DEPLOYMENT.abi, signer);
+}
+
+/** Placed and effective step from the BidPlaced event in a mined receipt (SPEC §6, AC58), or null. */
+export function bidStepsFromReceipt(c, receipt) {
+  for (const log of receipt?.logs ?? []) {
+    if (log.address?.toLowerCase() !== String(c.target).toLowerCase()) continue;
+    let parsed = null;
+    try {
+      parsed = c.interface.parseLog(log);
+    } catch {
+      continue;
+    }
+    if (parsed?.name === "BidPlaced") {
+      return { placedStep: Number(parsed.args.placedStep), effectiveStep: Number(parsed.args.effectiveStep) };
+    }
+  }
+  return null;
 }
 
 /**
@@ -36,12 +53,26 @@ export async function sendWithHeadroom(provider, c, method, ...args) {
 
 const range = (n) => Array.from({ length: n }, (_, i) => i);
 
+/** The pending block's timestamp in seconds, or 0 when the node cannot supply one. */
+async function pendingTimestamp() {
+  try {
+    const pending = await readProvider.send("eth_getBlockByNumber", ["pending", false]);
+    return pending?.timestamp ? Number(BigInt(pending.timestamp)) : 0;
+  } catch {
+    return 0;
+  }
+}
+
 /** Reads contract state and events at one captured block height. */
 export async function loadSnapshot(c, account) {
   const block = await readProvider.getBlock("latest");
   if (!block) throw new Error("Latest block is unavailable.");
   const atBlock = { blockTag: block.number };
   const fetchedAt = Date.now() / 1000;
+  // The pending block carries the timestamp the next block will get. A local chain that mines only
+  // on transactions leaves the latest block behind real time, so countdowns run from this instead.
+  // Read it as raw JSON: Hardhat returns the pending block with number null, which getBlock rejects.
+  const nextBlockTime = Math.max(Number(block.timestamp), await pendingTimestamp());
 
   const [state, startTime, endTime, stepCount, stepSeconds, supply, cur, ended, soldOut, soldOutStep,
     owner, finalizedAt, proceedsWithdrawn, reservePrice, minBid, clearing, bidIds, claimDeadline, maxBidsPerAddress] = await Promise.all([
@@ -111,6 +142,9 @@ export async function loadSnapshot(c, account) {
   return {
     fetchedAt,
     chainNow: Number(block.timestamp),
+    nextBlockTime,
+    // Active at the latest block, but the next block is at or past END (SPEC section 6, AC55).
+    awaitingBlock: Number(state) === 1 && !ended && nextBlockTime >= Number(endTime),
     state: Number(state),
     startTime: Number(startTime),
     endTime: Number(endTime),

@@ -23,6 +23,8 @@ vi.mock("./auction.js", async (importOriginal) => ({ ...await importOriginal(),
   readProvider: { getNetwork: async () => ({ chainId: 31337n }) },
   loadSnapshot: async () => mocks.snapshot,
   writeContract: () => ({ target: ADDRESS, interface: IFACE, bid: mocks.bid }),
+  // Sends the call unchanged so the mined receipt reaches the UI; gas headroom is covered by AC56 tests.
+  sendWithHeadroom: (provider, c, method, ...args) => c[method](...args),
 }));
 const { default: App } = await import("./App.jsx");
 const { bidStepsFromReceipt } = await import("./auction.js");

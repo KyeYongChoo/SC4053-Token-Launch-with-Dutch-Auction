@@ -29,6 +29,7 @@ import {
   quoteBid,
   readContract,
   readProvider,
+  sendWithHeadroom,
   writeContract,
 } from "./auction.js";
 
@@ -160,15 +161,15 @@ export default function App() {
     return writeContract(await provider.getSigner());
   };
 
-  const run = async (label, send, confirmed = () => "") => {
+  const run = async (label, method, args = [], confirmed) => {
     setBusy(label);
     setNotice("");
     try {
       const c = await signed();
-      const tx = await send(c);
+      const tx = await sendWithHeadroom(readProvider, c, method, ...args);
       setNotice(`${label}: waiting for confirmation...`);
       const receipt = await tx.wait();
-      setNotice(`${label}: confirmed.${confirmed(c, receipt)}`);
+      setNotice(`${label}: confirmed.${confirmed?.(c, receipt) ?? ""}`);
     } catch (e) {
       setNotice(`${label} failed: ${e.reason ?? e.shortMessage ?? e.message}`);
     } finally {
@@ -252,7 +253,7 @@ export default function App() {
               {snap.awaitingBlock && (
                 <p className="muted small">No block has been mined since the end yet; the next transaction closes the auction.</p>
               )}
-              <button className="primary" onClick={() => run("Finalize", (c) => c.finalize())} disabled={!canAct}>
+              <button className="primary" onClick={() => run("Finalize", "finalize")} disabled={!canAct}>
                 Finalize
               </button>
               {!account && <p className="muted small">Connect a wallet to finalize.</p>}
@@ -261,7 +262,7 @@ export default function App() {
           <PriceChart snap={snap} />
           <div className="grid2">
             <BidForm snap={snap} chainNow={chainNow} disabled={!canAct || snap.state !== 1 || snap.ended} onBid={(amt, max) =>
-              run("Bid", (c) => c.bid(parseEther(max), { value: parseEther(amt) }), bidConfirmed)
+              run("Bid", "bid", [parseEther(max), { value: parseEther(amt) }], bidConfirmed)
             } />
             {isOwner && <OwnerPanel snap={snap} canAct={canAct} run={run} />}
           </div>
@@ -270,8 +271,8 @@ export default function App() {
             chainNow={chainNow}
             account={account}
             canAct={canAct}
-            onCancel={(id) => run("Cancel", (c) => c.cancelBid(id))}
-            onClaim={() => run("Claim", (c) => c.claim())}
+            onCancel={(id) => run("Cancel", "cancelBid", [id])}
+            onClaim={() => run("Claim", "claim")}
           />
           <BidFeed snap={snap} />
         </>
@@ -547,22 +548,24 @@ function MyBids({ snap, chainNow, account, canAct, onCancel, onClaim }) {
 
 function OwnerPanel({ snap, canAct, run }) {
   const canStart = snap.state === 0;
-  const canWithdraw = !snap.proceedsWithdrawn && (snap.state === 2 || (snap.state === 1 && snap.ended));
+  const noProceeds = snap.state === 2 && snap.clearing.proceeds === 0n;
+  const canWithdraw = !snap.proceedsWithdrawn && !noProceeds && (snap.state === 2 || (snap.state === 1 && snap.ended));
   const canSweep = snap.state === 2 && snap.chainNow > snap.claimDeadline;
   return (
     <section className="card">
       <h2>Owner</h2>
       <div className="col">
-        <button disabled={!canAct || !canStart} onClick={() => run("Start", (c) => c.startAuction())}>
+        <button disabled={!canAct || !canStart} onClick={() => run("Start", "startAuction")}>
           Start auction
         </button>
-        <button disabled={!canAct || !canWithdraw} onClick={() => run("Withdraw proceeds", (c) => c.withdrawProceeds())}>
+        <button disabled={!canAct || !canWithdraw} onClick={() => run("Withdraw proceeds", "withdrawProceeds")}>
           Withdraw proceeds
         </button>
-        <button disabled={!canAct || !canSweep} onClick={() => run("Sweep", (c) => c.sweep())}>
+        <button disabled={!canAct || !canSweep} onClick={() => run("Sweep", "sweep")}>
           Sweep after claim deadline
         </button>
       </div>
+      {noProceeds && <p className="muted small">No proceeds to withdraw.</p>}
       <p className="muted small">
         Claim deadline: {snap.claimDeadline ? fmtTime(snap.claimDeadline) : "set when the auction is finalized"}.
       </p>

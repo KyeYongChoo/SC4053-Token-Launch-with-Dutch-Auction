@@ -3,7 +3,8 @@ import deployment from "./deployment.json";
 
 // Data access for the auction. The quote and preview maths (SPEC.md §2) live in maths.js, which
 // the contract tests also load, and are re-exported here. The contract remains the source of truth.
-export { WAD, boundaryNotice, displayedStep, previewBid, quoteBid } from "./maths.js";
+import { gasLimitFor } from "./maths.js";
+export { WAD, boundaryNotice, displayedStep, gasLimitFor, previewBid, quoteBid } from "./maths.js";
 
 export const DEPLOYMENT = deployment;
 export const RPC_URL = import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545";
@@ -34,6 +35,20 @@ export function bidStepsFromReceipt(c, receipt) {
     }
   }
   return null;
+}
+
+/**
+ * Estimates `method` against the pending block on `provider` (the read RPC), then sends it with gasLimitFor(estimate).
+ * A reverting estimate throws with its reason, so the wallet is never asked to sign.
+ */
+export async function sendWithHeadroom(provider, c, method, ...args) {
+  const inputs = c.interface.getFunction(method).inputs.length;
+  const params = args.slice(0, inputs);
+  const overrides = args[inputs] ?? {};
+  const tx = await c[method].populateTransaction(...params, overrides);
+  tx.from = await c.runner.getAddress();
+  const estimate = await provider.send("eth_estimateGas", [provider.getRpcTransaction(tx), "pending"]);
+  return c[method](...params, { ...overrides, gasLimit: gasLimitFor(estimate) });
 }
 
 const range = (n) => Array.from({ length: n }, (_, i) => i);

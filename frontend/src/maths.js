@@ -1,7 +1,10 @@
-// Quote and preview maths for the auction, with no imports, so the contract tests can load this
+// Quote, preview and gas-limit maths for the auction, with no imports, so the contract tests can load this
 // file in Node and compare it with the chain (test/FrontendMaths.test.js). Mirrors SPEC.md §2.
 
 export const WAD = 10n ** 18n;
+
+/** SPEC §6 "Gas limit": ceil(estimate × 1.25), headroom for steps that begin before the transaction is mined. */
+export const gasLimitFor = (estimate) => (BigInt(estimate) * 125n + 99n) / 100n;
 
 /** Per-bid tokens and refund under the clearing result (SPEC §2.11). Null before finalization. */
 export function quoteBid(bid, cl) {

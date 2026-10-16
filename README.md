@@ -49,6 +49,8 @@ npm run frontend
 
 Add the local chain to MetaMask (RPC `http://127.0.0.1:8545`, chain ID `31337`), then import one of the Hardhat test accounts that `npm run node` prints.
 
+Each time you restart `npm run node`, the chain starts again from block 0 and every account's nonce resets. MetaMask still holds the old chain's activity for the same nonces, so it can show a successful transaction as failed or suggest a stale nonce. After each restart, clear MetaMask's activity and nonce data: in Settings → Advanced, choose **Clear activity tab data**. Some MetaMask versions clear only the selected account, so repeat it for each imported account. Redeploying (`npm run deploy:local`) on a node that is still running needs no reset. On Sepolia the chain is never reset, so this does not apply.
+
 `deploy:local` takes its settings from the environment. The defaults match the demo: 100 tokens, a 2.9 ETH start price, a 1.0 ETH reserve, and 60-second steps. See `.env.example` for the full list.
 
 ### Deploy to Sepolia

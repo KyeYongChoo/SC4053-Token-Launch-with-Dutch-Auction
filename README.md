@@ -38,7 +38,7 @@ npm run frontend:test  # run the front-end tests
 
 ### Run it locally
 
-In one terminal, start a local chain. In a second terminal, deploy the auction and start the web app:
+In one terminal, start a local chain. `npm run node` only starts the chain; it doesn't deploy anything. In a second terminal, deploy the auction and start the web app:
 
 ```bash
 npm run node
@@ -53,15 +53,139 @@ Each time you restart `npm run node`, the chain starts again from block 0 and ev
 
 `deploy:local` takes its settings from the environment. The defaults match the demo: 100 tokens, a 2.9 ETH start price, a 1.0 ETH reserve, and 60-second steps. See `.env.example` for the full list.
 
-### Deploy to Sepolia
+### Deploy to Sepolia, step by step
 
-Copy `.env.example` to `.env`, then set `SEPOLIA_RPC_URL` and `DEPLOYER_PRIVATE_KEY`. Keep `.env` out of version control.
+Sepolia is a public Ethereum test network. Its ETH is free and worthless. Unlike the local chain it is shared, so everyone in the group can use the same auction from their own computer.
+
+> **Local chain and Sepolia are separate.** `npm run node` only starts a private chain on your computer; it deploys nothing. The 20 accounts it prints, and any contract address from `npm run deploy:local`, exist only on that chain. None of them work on Sepolia. The private keys of those test accounts are published for everyone who uses Hardhat, so never send ETH to them on a public network: bots take it within seconds.
+
+You will fill in two different `.env` files. Both are git-ignored; never commit them.
+
+| File | Read by | What goes in it |
+|---|---|---|
+| `.env` (project root) | `npm run deploy:sepolia` | `SEPOLIA_RPC_URL`, `DEPLOYER_PRIVATE_KEY` |
+| `frontend/.env.local` | the web app (`npm run frontend`) | `VITE_RPC_URL` |
+
+If you only want to bid on an auction a groupmate already deployed, skip to [Join a groupmate's auction](#join-a-groupmates-auction).
+
+#### 1. Make a test-only MetaMask account
+
+Use a new account that holds nothing of value, because step 4 copies its private key into a file. In MetaMask, open the account list and choose **Add account**. Then open the network list, turn on **Show test networks**, and select **Sepolia**.
+
+#### 2. Get Sepolia ETH
+
+Search for "Sepolia faucet" (for example, Google Cloud's Web3 faucet), and paste your account's **address**. Deploying and starting the auction cost about 0.02 Sepolia ETH in our test (it depends on Sepolia's gas price), and the minimum bid is 0.01 ETH. Get at least 0.05 Sepolia ETH before deploying. Faucets often give a small amount per day, so ask early. Everyone who wants to bid needs their own Sepolia ETH.
+
+#### 3. Get an RPC URL for deploying
+
+An RPC URL is the web address your computer uses to talk to Sepolia. Create a free account at [Alchemy](https://www.alchemy.com/) or [Infura](https://www.infura.io/), create an app or API key for **Ethereum Sepolia**, and copy its HTTPS URL. It looks like one of these:
+
+```
+https://eth-sepolia.g.alchemy.com/v2/<your key>
+https://sepolia.infura.io/v3/<your key>
+```
+
+#### 4. Copy the account's private key, not its address
+
+MetaMask shows two long hex strings for every account. The deploy script needs the private key.
+
+| | What it looks like | Length | Share it? |
+|---|---|---|---|
+| Address | `0x` followed by 40 characters | 42 | Yes |
+| Private key | 64 characters, sometimes with `0x` in front | 64 or 66 | **Never** |
+
+To get the private key: in MetaMask, open the **⋮** menu → **Account details** → **Show private key**, and enter your MetaMask password. If the deploy later says the private key is too short, you pasted the address.
+
+#### 5. Fill in the root `.env`
+
+Copy the example file (`cp .env.example .env`, or `copy .env.example .env` in Windows Command Prompt), then fill in the two values. No quotes, and no spaces around `=`:
+
+```
+SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/<your key>
+DEPLOYER_PRIVATE_KEY=<your 64-character private key>
+```
+
+**Decide when the 20 minutes start.** By default the deploy script also starts the auction, so the 20-minute window begins as soon as the deploy finishes. To start it yourself later from the web app, once the group is ready, also add:
+
+```
+START_AUCTION=false
+```
+
+#### 6. Deploy
 
 ```bash
 npm run deploy:sepolia
 ```
 
-The deploy script writes the chain ID and deploy block into `frontend/src/deployment.json`. The web app reads the chain ID from that file.
+This takes up to a minute, because it waits for Sepolia to include each transaction. You should see:
+
+```
+Deploying from 0x... on chain 11155111
+DutchAuction: 0x...
+LaunchToken:  0x...
+Auction started at block timestamp ...      (only if START_AUCTION is not false)
+Wrote frontend/src/deployment.json
+```
+
+The account in `DEPLOYER_PRIVATE_KEY` is the auction's owner. `frontend/src/deployment.json` now points the web app at your new contract. That file is generated, so don't edit it by hand.
+
+#### 7. Point the web app at Sepolia
+
+Create `frontend/.env.local` containing:
+
+```
+VITE_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
+```
+
+An Infura URL also works. **Do not use a free-tier Alchemy URL here**, even though it works for deploying. The web app reads past bids with `eth_getLogs`, and Alchemy's free tier allows only a 10-block range, so the page shows "Could not read the chain: missing revert data" or "failed to fetch".
+
+If `npm run frontend` is already running, stop it (Ctrl+C) and start it again. The web app reads `.env` files only when it starts; refreshing the browser is not enough.
+
+#### 8. Use the auction
+
+```bash
+npm --prefix frontend ci   # first time only
+npm run frontend
+```
+
+Open the URL it prints, click **Connect wallet**, and switch MetaMask to Sepolia if the page asks. The owner account shows "(owner)" and gets the owner panel.
+
+1. If you deployed with `START_AUCTION=false`, the owner clicks **Start**.
+2. Anyone with Sepolia ETH bids. The price drops every 60 seconds, and the auction ends after 20 minutes or when it sells out.
+3. After the end, anyone clicks **Finalize**, each bidder clicks **Claim**, and the owner clicks **Withdraw proceeds**.
+
+Sepolia makes a block about every 12 seconds, so each transaction takes a little while to confirm. Every transaction is visible at `https://sepolia.etherscan.io/address/<auction address>`.
+
+#### Join a groupmate's auction
+
+One person deploys (steps 1 to 6). Everyone else:
+
+1. Gets `frontend/src/deployment.json` from the person who deployed, and replaces their own copy with it. The file holds only contract addresses and the ABI, so it is safe to share.
+2. Does steps 1, 2 and 7 (a MetaMask account with Sepolia ETH, and `frontend/.env.local`). You do not need the root `.env`.
+3. Runs `npm run frontend` and connects.
+
+Git tracks `deployment.json` with an empty placeholder, so a real deployment shows up as a change. Don't commit it. To stop git listing it as changed, run `git update-index --skip-worktree frontend/src/deployment.json`; undo that with `--no-skip-worktree`.
+
+#### Switch back to the local chain
+
+1. Keep a copy of your Sepolia `deployment.json` somewhere outside the repo if you want to come back to that auction.
+2. With `npm run node` running, run `npm run deploy:local`. This overwrites `deployment.json` with the local deployment.
+3. Delete `frontend/.env.local`, or comment out its `VITE_RPC_URL` line. Without it the web app uses the local chain.
+4. Restart `npm run frontend`, and switch MetaMask to the local network.
+
+#### Troubleshooting
+
+| What you see | Cause | Fix |
+|---|---|---|
+| Deploy fails: private key too short or invalid | `DEPLOYER_PRIVATE_KEY` holds the 42-character address | Step 4 |
+| Deploy fails: `insufficient funds` | The deploying account has no Sepolia ETH | Step 2 |
+| Deploy fails mentioning the URL or network | `SEPOLIA_RPC_URL` is empty or wrong, or `.env` is not in the project root | Step 5 |
+| "No deployment found" | `deployment.json` is still the placeholder | Deploy (step 6) or get the file from a groupmate |
+| "Could not read the chain: missing revert data" or "failed to fetch" | The web app's RPC is a free-tier Alchemy URL | Step 7 |
+| "RPC network mismatch" or "Read-only RPC is on chain 31337" | The web app is still reading the local chain | Set `VITE_RPC_URL` (step 7) and restart `npm run frontend` |
+| "Wrong network" banner | MetaMask is not on Sepolia | Click **Switch network** |
+| Stuck on "Loading auction..." with no error | Known bug [#53](https://github.com/KyeYongChoo/SC4053-Token-Launch-with-Dutch-Auction/issues/53): reading Sepolia takes longer than the 2-second refresh | Until it's fixed, temporarily change `POLL_MS` in `frontend/src/App.jsx` to `8000`. Don't commit that |
+| Bid button disabled, or a bid fails | The auction hasn't started, or its 20 minutes are over | Owner clicks **Start**, or deploy a new auction |
 
 ## Tests and CI
 

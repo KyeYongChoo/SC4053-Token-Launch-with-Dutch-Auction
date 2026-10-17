@@ -184,7 +184,6 @@ Git tracks `deployment.json` with an empty placeholder, so a real deployment sho
 | "Could not read the chain: missing revert data" or "failed to fetch" | The web app's RPC is a free-tier Alchemy URL | Step 7 |
 | "RPC network mismatch" or "Read-only RPC is on chain 31337" | The web app is still reading the local chain | Set `VITE_RPC_URL` (step 7) and restart `npm run frontend` |
 | "Wrong network" banner | MetaMask is not on Sepolia | Click **Switch network** |
-| Stuck on "Loading auction..." with no error | Known bug [#53](https://github.com/KyeYongChoo/SC4053-Token-Launch-with-Dutch-Auction/issues/53): reading Sepolia takes longer than the 2-second refresh | Until it's fixed, temporarily change `POLL_MS` in `frontend/src/App.jsx` to `8000`. Don't commit that |
 | Bid button disabled, or a bid fails | The auction hasn't started, or its 20 minutes are over | Owner clicks **Start**, or deploy a new auction |
 
 ## Tests and CI

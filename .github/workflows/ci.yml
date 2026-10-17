@@ -74,3 +74,6 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Build against fixture deployment and check bundle
+        run: npm run build:check

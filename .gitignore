@@ -6,6 +6,7 @@ typechain-types/
 .env
 frontend/node_modules/
 frontend/dist/
+frontend/dist-fixture/
 frontend/.vite/
 frontend/.env.local
 .venv-slither/

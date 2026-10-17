@@ -14,7 +14,8 @@ Ethereum token launch: an ERC-20 sold by a 20-minute stepped Dutch auction with 
 - `npm test`: contract tests.
 - `npm run frontend:test`: front-end tests (Vitest).
 - `npm run frontend:build`: front-end build.
-- CI (`.github/workflows/ci.yml`) runs all three, plus Slither on the contracts, and is the merge gate. Run them yourself before saying a change is done, and report the real results.
+- `npm run frontend:build:check`: front-end build against a fixture deployment, then a check that the bundle keeps App's render paths.
+- CI (`.github/workflows/ci.yml`) runs all four, plus Slither on the contracts, and is the merge gate. Run them yourself before saying a change is done, and report the real results.
 
 ## Rules
 - Never push to `main`. Work on a branch and open a PR.

@@ -11,6 +11,7 @@
     "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia",
     "frontend": "npm --prefix frontend run dev",
     "frontend:build": "npm --prefix frontend run build",
+    "frontend:build:check": "npm --prefix frontend run build:check",
     "frontend:test": "npm --prefix frontend test"
   },
   "devDependencies": {

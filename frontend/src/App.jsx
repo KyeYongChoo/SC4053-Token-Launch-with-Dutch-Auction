@@ -34,6 +34,7 @@ import {
 } from "./auction.js";
 
 const POLL_MS = 2000;
+const REFRESH_TIMEOUT_MS = 30000;
 
 export default function App() {
   // No contract without a deployment: the placeholder address is null and Contract() would throw.
@@ -47,18 +48,30 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const [, setTick] = useState(0);
   const refreshGeneration = useRef(0);
+  const refreshInFlight = useRef(0); // Generation of the running refresh, 0 when none.
+  const refreshTimers = useRef(new Set());
 
-  const refresh = useCallback(async () => {
-    if (!contract) return;
+  // A routine poll is skipped while a refresh runs, so a refresh slower than POLL_MS still publishes (AC61).
+  const refresh = useCallback(async (routine = false) => {
+    if (!contract || (routine && refreshInFlight.current)) return;
     const generation = ++refreshGeneration.current;
+    refreshInFlight.current = generation;
     let readChain = null; // Readiness stays while a routine poll runs; only failure or a mismatch clears it.
-    try {
+    let timer;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error("The RPC did not respond within 30 seconds.")), REFRESH_TIMEOUT_MS);
+      refreshTimers.current.add(timer);
+    });
+    const load = async () => {
       readChain = Number((await readProvider.getNetwork()).chainId);
-      if (generation !== refreshGeneration.current) return;
+      if (generation !== refreshGeneration.current) return null;
       if (readChain !== DEPLOYMENT.chainId) {
         throw new Error(`RPC network mismatch. Expected chain ${DEPLOYMENT.chainId}. Actions are disabled.`);
       }
-      const next = await loadSnapshot(contract, account || null);
+      return loadSnapshot(contract, account || null);
+    };
+    try {
+      const next = await Promise.race([load(), timeout]); // A response after the timeout is ignored.
       if (generation !== refreshGeneration.current) return;
       setSnap(next);
       setRpcChainId(readChain);
@@ -67,17 +80,23 @@ export default function App() {
       if (generation !== refreshGeneration.current) return;
       setRpcChainId(readChain !== DEPLOYMENT.chainId ? readChain : null);
       setLoadError(e.shortMessage ?? e.message);
+    } finally {
+      clearTimeout(timer);
+      refreshTimers.current.delete(timer);
+      if (refreshInFlight.current === generation) refreshInFlight.current = 0;
     }
   }, [contract, account]);
 
   useEffect(() => {
     refresh();
-    const id = setInterval(refresh, POLL_MS);
+    const id = setInterval(() => refresh(true), POLL_MS);
     return () => {
       clearInterval(id);
       ++refreshGeneration.current; // Invalidate reads from an old account or unmounted component.
     };
   }, [refresh]);
+
+  useEffect(() => () => refreshTimers.current.forEach(clearTimeout), []);
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000);

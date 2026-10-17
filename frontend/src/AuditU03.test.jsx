@@ -154,8 +154,11 @@ describe("Refresh ordering: old results cannot re-enable actions", () => {
     const old = deferred();
     mocks.snapshot.mockReturnValueOnce(old.promise);
     const pending = await beginRefresh();
-    mocks.rpc.mockResolvedValue({ chainId: 1n });
-    await refresh();
+    // The newer refresh is the post-transaction one, which starts at once; a routine poll would wait (AC61).
+    mocks.rpc.mockResolvedValueOnce({ chainId: 31337n }).mockResolvedValue({ chainId: 1n });
+    fireEvent.click(bidButton());
+    await waitFor(() => expect(mocks.send).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText(/read-only RPC is on chain 1/i)).toBeTruthy();
     await act(async () => { old.resolve(snapshot()); await pending.promise; });
     expectDisabled();
   });
@@ -164,8 +167,11 @@ describe("Refresh ordering: old results cannot re-enable actions", () => {
     const old = deferred();
     mocks.rpc.mockReturnValueOnce(old.promise);
     const pending = await beginRefresh();
-    mocks.rpc.mockRejectedValue(new Error("newer RPC failure"));
-    await refresh();
+    // The newer refresh is the post-transaction one, which starts at once; a routine poll would wait (AC61).
+    mocks.rpc.mockResolvedValueOnce({ chainId: 31337n }).mockRejectedValue(new Error("newer RPC failure"));
+    fireEvent.click(bidButton());
+    await waitFor(() => expect(mocks.send).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText(/newer RPC failure/)).toBeTruthy();
     await act(async () => { old.resolve({ chainId: 31337n }); await pending.promise; });
     expectDisabled();
   });

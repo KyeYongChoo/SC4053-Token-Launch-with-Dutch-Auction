@@ -113,11 +113,20 @@ export default function App() {
       setRpcChainId(null);
       window.location.reload();
     };
-    const onAccounts = (accounts) => {
+    // An account can arrive here without Connect (switched or imported in MetaMask), so read the
+    // wallet chain too; otherwise it stays unknown and actions stay disabled with no warning.
+    const onAccounts = async (accounts) => {
       ++refreshGeneration.current;
       setRpcChainId(null);
       setSnap(null);
+      setChainId(null);
       setAccount(accounts[0] ?? "");
+      if (!accounts[0]) return;
+      try {
+        setChainId(Number((await new BrowserProvider(eth).getNetwork()).chainId));
+      } catch {
+        setChainId(null);
+      }
     };
     eth.on("chainChanged", onChain);
     eth.on("accountsChanged", onAccounts);

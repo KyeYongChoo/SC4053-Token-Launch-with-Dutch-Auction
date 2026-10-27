@@ -114,6 +114,21 @@ describe("AC60: routine polls keep action readiness", () => {
     await act(async () => { latest.resolve(snapshot()); });
     await waitFor(() => expect(bidButton().disabled).toBe(false));
   });
+  it("reads the wallet chain when an account arrives without Connect", async () => {
+    render(<App />);
+    await screen.findByText("Place a bid");
+    await act(async () => { mocks.events.accountsChanged([ACCOUNT]); });
+    await screen.findByText(/0x0000.*0002/);
+    await waitFor(() => expect(bidButton().disabled).toBe(false));
+  });
+  it("warns on the wrong chain when an account arrives without Connect", async () => {
+    mocks.walletNetwork.mockResolvedValue({ chainId: 1n });
+    render(<App />);
+    await screen.findByText("Place a bid");
+    await act(async () => { mocks.events.accountsChanged([ACCOUNT]); });
+    expect(await screen.findByText(/Wrong network/)).toBeTruthy();
+    expectDisabled();
+  });
   it("disables actions at once on a network change", async () => {
     await ready();
     const reload = vi.fn();

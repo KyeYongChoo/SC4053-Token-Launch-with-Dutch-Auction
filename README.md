@@ -42,16 +42,41 @@ In one terminal, start a local chain. `npm run node` only starts the chain; it d
 
 ```bash
 npm run node
-npm run deploy:local
-npm --prefix frontend ci   # first time only
+START_AUCTION=false npm run deploy:local   # deploy without starting the auction
+npm --prefix frontend ci   # after cloning, or if the front-end install breaks
 npm run frontend
 ```
+
+`START_AUCTION=false` leaves the auction unstarted so you can start it during a demo with **Start auction** in the app's **Owner** panel, connected as the deployer (Hardhat account #0). Leave it out to start the auction at deploy. That line is bash syntax (Git Bash, macOS, Linux). In PowerShell, run `$env:START_AUCTION="false"; npm run deploy:local` instead.
+
+If `npm --prefix frontend ci` fails on Windows with `EPERM ... esbuild.exe`, a running Node process still has the file open. Stop `npm run node` and `npm run frontend`, then run it again.
 
 Add the local chain to MetaMask (RPC `http://127.0.0.1:8545`, chain ID `31337`), then import one of the Hardhat test accounts that `npm run node` prints.
 
 Each time you restart `npm run node`, the chain starts again from block 0 and every account's nonce resets. MetaMask still holds the old chain's activity for the same nonces, so it can show a successful transaction as failed or suggest a stale nonce. After each restart, clear MetaMask's activity and nonce data: in Settings → Advanced, choose **Clear activity tab data**. Some MetaMask versions clear only the selected account, so repeat it for each imported account. Redeploying (`npm run deploy:local`) on a node that is still running needs no reset. On Sepolia the chain is never reset, so this does not apply.
 
 `deploy:local` takes its settings from the environment. The defaults match the demo: 100 tokens, a 2.9 ETH start price, a 1.0 ETH reserve, and 60-second steps. See `.env.example` for the full list.
+
+#### Skip ahead in time
+
+To demo later stages without waiting, move the local chain's clock forward. In a new terminal, open the Hardhat console:
+
+```bash
+npx hardhat console --network localhost
+```
+
+Then enter, in the console:
+
+```js
+const { time } = require("@nomicfoundation/hardhat-network-helpers");
+
+// time.increase(seconds) moves the clock forward and mines a block
+await time.increase(5 * 60);            // skip 5 minutes (5 price steps)
+await time.increase(20 * 60);           // skip 20 minutes: the auction has ended
+await time.increase(30 * 24 * 60 * 60); // skip 30 days: the claim period is over, so the owner can sweep
+```
+
+The app picks up the new time on its next refresh.
 
 ### Deploy to Sepolia, step by step
 

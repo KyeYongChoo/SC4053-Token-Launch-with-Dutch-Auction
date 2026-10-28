@@ -33,7 +33,7 @@ Requires Node.js 20 or later.
 ```bash
 npm ci                 # install contract dependencies
 npm test               # run the contract tests
-npm run frontend:test  # run the front-end tests
+npm run frontend:test  # run the front-end tests - if it fails, run npm --prefix frontend ci
 ```
 
 ### Run it locally

@@ -217,10 +217,10 @@ Git tracks `deployment.json` with an empty placeholder, so a real deployment sho
 
 | Suite | Count | What it covers |
 |---|---|---|
-| Contract tests (`npm test`) | 100 | Acceptance criteria AC1–AC47 and AC53–AC54 (bid cap), C02/C03 and D01 audit regressions, reentrancy, mixed-role attacker, gas bounds at 120 steps, and the front-end quote and preview maths checked against the contract (AC50/AC51) |
-| Front-end tests (`npm run frontend:test`) | 121 | Quote and preview maths, AC48 wrong-network wallet, bid-cap message, U01–U04 status/deadline/network/snapshot regressions, exact bid IDs and stale-refresh protection |
+| Contract tests (`npm test`) | 100 | Acceptance criteria AC1–AC47 and AC53–AC54 (bid cap), AC56 on the chain (gas limit across a step boundary), C02/C03 and D01 audit regressions, reentrancy, mixed-role attacker, gas bounds at 120 steps, and the front-end quote and preview maths checked against the contract (AC50/AC51) |
+| Front-end tests (`npm run frontend:test`) | 121 | Quote and preview maths, AC48 wrong-network wallet, bid-cap message, U01–U04 status/deadline/network/snapshot regressions, exact bid IDs and stale-refresh protection, and AC55–AC61 (next-block price, gas limit, step-boundary notice, receipt step, zero-proceeds withdraw, readiness after an account change, slow refreshes) |
 
-These counts were independently executed locally on 14 October 2026 after integrating the audit feature branch with main and correcting D01; they are not a new CI run. The frontend build and configured Slither gate also passed. Slither reports zero unreviewed findings; 35 reviewed findings remain in the triage database.
+Counts checked locally on 1 November 2026 by running `npm test` (100 passing) and `npm run frontend:test` (121 passing). CI runs the same suites on every push. The configured Slither gate keeps 35 reviewed findings in the triage database (`slither.db.json`).
 
 GitHub Actions runs the contract tests, the front-end tests and build, and Slither static analysis on every push and pull request (`.github/workflows/ci.yml`). Slither fails on any finding not reviewed in `slither.db.json`; PLAN.md explains each reviewed finding and how to run it locally.
 
@@ -234,8 +234,9 @@ The reentrancy demonstration is bonus work. `VulnerableAuction` is a simplified 
 
 ## Status and known gaps
 
-- Milestones M1–M4 and the follow-ups are merged into `main`, with no open issues at inspection. The follow-ups were #15 (front-end maths checked against the chain, #33), #21 (gas bounds at 120 steps, #31) and #22 (wrong-network test, #32). #21 led to a SPEC amendment (#30): each address may place at most 100 bids, bounding auction claim work; measured 120-step auto-finalizing claims fit the 4.6-million-gas local test budget.
-- C02/C03 and U01–U04 are fixed on `fix/audit-c02-c03`, pending PR review and merge. D01 is resolved by correcting SPEC's residual ETH bound and adding eight settlement regressions; contract settlement behavior is unchanged. Tiny bids can still be charged while receiving zero token-wei, as explicitly documented in SPEC.
+- Milestones M1–M4 and the follow-ups are merged into `main`, with no open issues. The follow-ups were #15 (front-end maths checked against the chain, #33), #21 (gas bounds at 120 steps, #31) and #22 (wrong-network test, #32). #21 led to a SPEC amendment (#30): each address may place at most 100 bids, bounding auction claim work; measured 120-step auto-finalizing claims fit the 4.6-million-gas local test budget.
+- The audit findings C02/C03 and U01–U04 are fixed and merged. D01 is resolved by correcting SPEC's residual ETH bound and adding eight settlement regressions; contract settlement behavior is unchanged. Tiny bids can still be charged while receiving zero token-wei, as explicitly documented in SPEC.
+- Front-end fixes since the audit (AC55–AC61) are merged: gas-limit headroom across a step boundary, step-boundary notices, no withdraw button when there are no proceeds, no button flicker on polls, refreshes slower than the poll interval, and the wallet chain read on an account change.
 - The rendering parts of AC49–AC52 (chart, deadline display, owner panel visibility) are checked by hand.
 - The contracts have not been audited. Do not deploy them to mainnet.
 - Shill bidding by the owner is accepted, as SPEC.md section 8 puts anti-shill measures out of scope.

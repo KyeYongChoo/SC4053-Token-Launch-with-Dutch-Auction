@@ -217,8 +217,8 @@ Git tracks `deployment.json` with an empty placeholder, so a real deployment sho
 
 | Suite | Count | What it covers |
 |---|---|---|
-| Contract tests (`npm test`) | 98 | Acceptance criteria AC1–AC47 and AC53–AC54 (bid cap), C02/C03 and D01 audit regressions, reentrancy, mixed-role attacker, gas bounds at 120 steps, and the front-end quote and preview maths checked against the contract (AC50/AC51) |
-| Front-end tests (`npm run frontend:test`) | 63 | Quote and preview maths, AC48 wrong-network wallet, bid-cap message, U01–U04 status/deadline/network/snapshot regressions, exact bid IDs and stale-refresh protection |
+| Contract tests (`npm test`) | 100 | Acceptance criteria AC1–AC47 and AC53–AC54 (bid cap), C02/C03 and D01 audit regressions, reentrancy, mixed-role attacker, gas bounds at 120 steps, and the front-end quote and preview maths checked against the contract (AC50/AC51) |
+| Front-end tests (`npm run frontend:test`) | 121 | Quote and preview maths, AC48 wrong-network wallet, bid-cap message, U01–U04 status/deadline/network/snapshot regressions, exact bid IDs and stale-refresh protection |
 
 These counts were independently executed locally on 14 October 2026 after integrating the audit feature branch with main and correcting D01; they are not a new CI run. The frontend build and configured Slither gate also passed. Slither reports zero unreviewed findings; 35 reviewed findings remain in the triage database.
 
